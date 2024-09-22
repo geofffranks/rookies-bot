@@ -193,12 +193,12 @@ func generateNextRoundConfig(sgc *simgrid.SimGridClient, conf *config.Config, pe
 		return nil, fmt.Errorf("failed getting details for next round: %s", err)
 	}
 
-	nextRoundTracker, err := gcloud.GeneratePenaltyTracker(conf, nextRound)
+	nextRoundTracker, err := gcloud.GeneratePenaltyTracker(conf)
 	if err != nil {
 		return nil, fmt.Errorf("failed generating penalty tracker for next round: %s", err)
 	}
 
-	nextRound.PenaltyTrackerLink = nextRoundTracker
+	conf.NextRound.PenaltyTrackerLink = nextRoundTracker
 
 	return &config.RoundConfig{
 		PreviousRound:        conf.NextRound,

@@ -3,9 +3,10 @@ package gcloud
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/geofffranks/rookies-bot/config"
 	"github.com/geofffranks/rookies-bot/models"
-	"strings"
 
 	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
@@ -48,8 +49,8 @@ func GenerateBriefing(conf *config.Config, penalties *models.Penalties) (string,
 	return fmt.Sprintf("https://docs.google.com/document/d/%s", briefingFile.Id), nil
 }
 
-func GeneratePenaltyTracker(conf *config.Config, nextRound *config.Round) (string, error) {
-	file, err := copyFile(conf.TrackerTemplateDocID, conf.TrackerFolderID, fmt.Sprintf("%s Rookies Round %d - %s", conf.Season, nextRound.Number, nextRound.Track))
+func GeneratePenaltyTracker(conf *config.Config) (string, error) {
+	file, err := copyFile(conf.TrackerTemplateDocID, conf.TrackerFolderID, fmt.Sprintf("%s Rookies Round %d - %s", conf.Season, conf.NextRound.Number, conf.NextRound.Track))
 	if err != nil {
 		return "", err
 	}
