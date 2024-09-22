@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"rookies-bot/config"
-	"rookies-bot/discord"
-	"rookies-bot/gcloud"
-	"rookies-bot/models"
-	"rookies-bot/simgrid"
+	"github.com/geofffranks/rookies-bot/config"
+	"github.com/geofffranks/rookies-bot/discord"
+	"github.com/geofffranks/rookies-bot/gcloud"
+	"github.com/geofffranks/rookies-bot/models"
+	"github.com/geofffranks/rookies-bot/simgrid"
 
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
@@ -107,7 +107,7 @@ func main() {
 		},
 		Before: func(cCtx *cli.Context) error {
 			var err error
-			set := flag.NewFlagSet("rookies-bot", 1)
+			set := flag.NewFlagSet("github.com/geofffranks/rookies-bot", 1)
 			nc := cli.NewContext(cCtx.App, set, cCtx)
 
 			roundConfig := cCtx.Args().Get(1)

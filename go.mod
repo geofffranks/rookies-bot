@@ -1,4 +1,4 @@
-module rookies-bot
+module github.com/geofffranks/rookies-bot
 
 go 1.23
 

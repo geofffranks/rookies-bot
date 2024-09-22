@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"rookies-bot/config"
-	"rookies-bot/models"
+	"github.com/geofffranks/rookies-bot/config"
+	"github.com/geofffranks/rookies-bot/models"
 )
 
 type SimGridClient struct {

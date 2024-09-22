@@ -1,6 +1,6 @@
 package models
 
-import "rookies-bot/config"
+import "github.com/geofffranks/rookies-bot/config"
 
 type DriverLookup map[int]Driver
 

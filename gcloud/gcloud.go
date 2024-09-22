@@ -3,8 +3,8 @@ package gcloud
 import (
 	"context"
 	"fmt"
-	"rookies-bot/config"
-	"rookies-bot/models"
+	"github.com/geofffranks/rookies-bot/config"
+	"github.com/geofffranks/rookies-bot/models"
 	"strings"
 
 	"google.golang.org/api/docs/v1"
