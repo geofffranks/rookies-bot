@@ -29,6 +29,18 @@ func (p *Penalties) Consolidate() config.Penalty {
 
 }
 
+func (p *Penalties) UniqueDriverNumbers() []int {
+	return uniqueDrivers(append(p.QualiBans,
+		append(p.QualiBansCarriedOver,
+			append(p.PitStartsR1,
+				append(p.PitStartsR1CarriedOver,
+					append(p.PitStartsR2, p.PitStartsR2CarriedOver...)...,
+				)...,
+			)...,
+		)...,
+	))
+}
+
 func uniqueDrivers(drivers []Driver) []int {
 	l := map[int]struct{}{}
 

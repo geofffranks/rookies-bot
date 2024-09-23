@@ -81,6 +81,12 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("Failed to write out next round config to %s: %s\n", file, err)
 			}
+
+		}
+
+		fmt.Printf("DQ List:\n")
+		for _, carNum := range penalties.UniqueDriverNumbers() {
+			fmt.Printf("/dq %d\n", carNum)
 		}
 		return nil
 	}
