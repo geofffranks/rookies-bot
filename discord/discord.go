@@ -187,7 +187,7 @@ func (d *DiscordClient) getDriverId(handle string) (snowflake.ID, error) {
 		return 0, err
 	}
 	if len(members) != 1 {
-		return 0, fmt.Errorf("Unexpected number of members returned from search for %s: %#v", handle, members)
+		return 0, fmt.Errorf("unexpected number of members returned from search for %s: %#v", handle, members)
 	}
 
 	d.driverLookup[handle] = members[0].User.ID
