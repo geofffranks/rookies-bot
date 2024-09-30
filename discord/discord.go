@@ -131,8 +131,8 @@ func (d *DiscordClient) briefingTime() (time.Time, error) {
 
 	now := time.Now().In(location)
 
-	dayOffset := now.Weekday() - time.Monday
-	targetDate := now.AddDate(0, 0, -int(dayOffset)+7)
+	dayOffset := (time.Monday + 7 - now.Weekday()) % 7
+	targetDate := now.AddDate(0, 0, int(dayOffset))
 	return time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 19, 45, 00, 00, location), nil
 }
 
