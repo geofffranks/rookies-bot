@@ -29,57 +29,57 @@ func main() {
 	announcePenalties := func(cCtx *cli.Context) error {
 		penaltyMessage, err := dc.BuildPenaltyMessage(penalties)
 		if err != nil {
-			return fmt.Errorf("Failed to generate penalty message: %s\n", err)
+			return fmt.Errorf("failed to generate penalty message: %s", err)
 		}
 		msg, err := dc.SendMessage(penaltyMessage)
 		if err != nil {
-			return fmt.Errorf("Failed to send penalty announcement: %s\n", err)
+			return fmt.Errorf("failed to send penalty announcement: %s", err)
 		}
 		err = dc.Repin(msg)
 		if err != nil {
-			log.Fatalf("Failed to pin penalty announcement: %s\n", err)
+			log.Fatalf("failed to pin penalty announcement: %s", err)
 		}
 		return nil
 	}
 
 	raceSetup := func(cCtx *cli.Context) error {
-		_, err := gcloud.GenerateBriefing(conf, penalties)
+		briefingDoc, err := gcloud.GenerateBriefing(conf, penalties)
 		if err != nil {
-			return fmt.Errorf("Failed to generate briefing doc: %s", err)
+			return fmt.Errorf("failed to generate briefing doc: %s", err)
 		}
 
-		briefingMessage, err := dc.BuildBriefingMessage(penalties)
+		briefingMessage, err := dc.BuildBriefingMessage(penalties, briefingDoc)
 		if err != nil {
-			return fmt.Errorf("Failed to generate briefingmessage: %s\n", err)
+			return fmt.Errorf("failed to generate briefingmessage: %s", err)
 		}
 		msg, err := dc.SendMessage(briefingMessage)
 		if err != nil {
-			return fmt.Errorf("Failed to send briefing announcement: %s\n", err)
+			return fmt.Errorf("failed to send briefing announcement: %s", err)
 		}
 		err = dc.Repin(msg)
 		if err != nil {
-			return fmt.Errorf("Failed to pin briefing announcement: %s\n", err)
+			return fmt.Errorf("failed to pin briefing announcement: %s", err)
 		}
 
 		err = dc.CreateBriefingEvent()
 		if err != nil {
-			return fmt.Errorf("Failed to create briefing event: %s\n", err)
+			return fmt.Errorf("failed to create briefing event: %s", err)
 		}
 
 		if conf.NextRound.Track != "" {
 			nextRoundConfig, err := generateNextRoundConfig(sgClient, conf, penalties)
 			if err != nil {
-				return fmt.Errorf("Failed to generate config for next round: %s\n", err)
+				return fmt.Errorf("failed to generate config for next round: %s", err)
 			}
 			data, err := yaml.Marshal(nextRoundConfig)
 			if err != nil {
-				return fmt.Errorf("Failed to convert next round config to yaml: %s\n", err)
+				return fmt.Errorf("failed to convert next round config to yaml: %s", err)
 			}
 
 			file := strings.ToLower(fmt.Sprintf("%s-round-%d-%s.yml", conf.Season, conf.NextRound.Number, strings.ReplaceAll(conf.NextRound.Track, " ", "-")))
 			err = os.WriteFile(file, data, 0644)
 			if err != nil {
-				return fmt.Errorf("Failed to write out next round config to %s: %s\n", file, err)
+				return fmt.Errorf("failed to write out next round config to %s: %s", file, err)
 			}
 
 		}
@@ -93,14 +93,14 @@ func main() {
 
 	app := &cli.App{
 		Commands: []*cli.Command{
-			&cli.Command{
+			{
 				Name:        "announce-penalties",
 				Usage:       "announce-penalties <roundX.yml>",
 				Description: "Announces penalties to Discord",
 				Args:        true,
 				Action:      announcePenalties,
 			},
-			&cli.Command{
+			{
 				Name:        "race-setup",
 				Usage:       "race-setup <roundX.yml>",
 				Description: "Generates the race briefing doc, schedules the event, announces it in discord, and sets up the next round's penalty file",
@@ -118,11 +118,11 @@ func main() {
 
 			roundConfig := cCtx.Args().Get(1)
 			if roundConfig == "" {
-				return fmt.Errorf("Bad args")
+				return fmt.Errorf("bad args")
 			}
 			conf, err = config.Load(nc.String("config"), roundConfig)
 			if err != nil {
-				return fmt.Errorf("Could not load configs: %s\n", err)
+				return fmt.Errorf("could not load configs: %s", err)
 			}
 			sgClient = simgrid.NewClient(conf.SimGridApiToken)
 
@@ -133,11 +133,11 @@ func main() {
 
 			penalties, err = buildPenaltyList(driverLookup, conf)
 			if err != nil {
-				return fmt.Errorf("Failed penalty summary: %s\n", err)
+				return fmt.Errorf("failed penalty summary: %s", err)
 			}
 			dc, err = discord.NewDiscordClient(conf)
 			if err != nil {
-				return fmt.Errorf("Failed to connect to discord: %s\n", err)
+				return fmt.Errorf("failed to connect to discord: %s", err)
 			}
 			return nil
 		},
@@ -187,7 +187,7 @@ func buildPenalizedDriverList(driverLookup models.DriverLookup, carNumbers []int
 		if driver, ok := driverLookup[carNumber]; ok {
 			driverList = append(driverList, driver)
 		} else {
-			return nil, fmt.Errorf("Could not find driver %d in registered SimGrid drivers. Please double check the car number and try again. Drivers may have changed their number, or withdrawn since the last race.", carNumber)
+			return nil, fmt.Errorf("could not find driver %d in registered SimGrid drivers. Please double check the car number and try again. Drivers may have changed their number, or withdrawn since the last race.", carNumber)
 		}
 	}
 	return driverList, nil

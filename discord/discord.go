@@ -2,9 +2,10 @@ package discord
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/geofffranks/rookies-bot/config"
 	"github.com/geofffranks/rookies-bot/models"
-	"time"
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
@@ -49,7 +50,7 @@ Stewarding is in from Round %d. The following penalties are to be served next we
 
 }
 
-func (d *DiscordClient) BuildBriefingMessage(penalties *models.Penalties) (discord.MessageCreate, error) {
+func (d *DiscordClient) BuildBriefingMessage(penalties *models.Penalties, briefingUrl string) (discord.MessageCreate, error) {
 	role, err := d.lookupRole(d.conf.DiscordRoleName)
 	if err != nil {
 		return discord.MessageCreate{}, err
@@ -63,10 +64,10 @@ func (d *DiscordClient) BuildBriefingMessage(penalties *models.Penalties) (disco
 	message := fmt.Sprintf(`
 🏎 **It's Race Day!!** 🏎
 
-<@&%s> **Mandatory** drivers' briefing is at <t:%d>. Here's the [briefing doc](https://docs.google.com/document/d/1K98UzZNp2W2qqu-PLPCG4tNJl9Vv6qRxdpbS0o5IFWg/edit) for Round 2.
+<@&%s> **Mandatory** drivers' briefing is at <t:%d>. Here's the [briefing doc](%s) for Round %d.
 
 **Penalties to be Served This Week**
-`, role.ID, briefingTime.Unix())
+`, role.ID, briefingTime.Unix(), briefingUrl, d.conf.NextRound.Number)
 
 	penaltyMessage, err := d.generatePenaltyMessage(penalties)
 	if err != nil {
