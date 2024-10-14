@@ -21,13 +21,15 @@ type Round struct {
 }
 
 type BotConfig struct {
-	SimGridApiToken       string `yaml:"simgrid_api_token"`
-	ChampionshipId        string `yaml:"championship_id"`
-	Season                string `yaml:"season"`
-	BriefingTemplateDocID string `yaml:"briefing_template_doc_id"`
-	BriefingFolderID      string `yaml:"briefing_folder_id"`
-	TrackerTemplateDocID  string `yaml:"tracker_template_doc_id"`
-	TrackerFolderID       string `yaml:"tracker_folder_id"`
+	SimGridApiToken string `yaml:"simgrid_api_token"`
+	ChampionshipId  string `yaml:"championship_id"`
+	Season          string `yaml:"season"`
+
+	GoogleServiceAccountToken string `yaml:"service_account_token_file"`
+	BriefingTemplateDocID     string `yaml:"briefing_template_doc_id"`
+	BriefingFolderID          string `yaml:"briefing_folder_id"`
+	TrackerTemplateDocID      string `yaml:"tracker_template_doc_id"`
+	TrackerFolderID           string `yaml:"tracker_folder_id"`
 
 	DiscordToken             string       `yaml:"discord_token"`
 	DiscordChannelId         snowflake.ID `yaml:"discord_channel_id"`
@@ -65,6 +67,7 @@ func Load(botConfigPath, roundConfigPath string) (*Config, error) {
 		BotConfig:   *botConfig,
 		RoundConfig: *roundConfig,
 	}
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.GoogleServiceAccountToken)
 	return config, nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
 	"github.com/geofffranks/rookies-bot/config"
 	"github.com/geofffranks/rookies-bot/models"
 )
@@ -35,6 +36,7 @@ type Entry struct {
 type Driver struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
+	PlayerID  string `json:"playerID"`
 }
 
 type Race struct {
@@ -48,6 +50,7 @@ type Championship struct {
 type User struct {
 	FirstName     string `json:"first_name"`
 	LastName      string `json:"last_name"`
+	SteamID       string `json:"steam64_id"`
 	DiscordHandle string `json:"username"`
 	CarNumber     int
 }
@@ -131,8 +134,7 @@ func (sgc *SimGridClient) BuildDriverLookup(id string) (models.DriverLookup, err
 		return nil, err
 	}
 	for _, user := range users {
-		name := fmt.Sprintf("%s%s", user.FirstName, user.LastName)
-		userLookup[name] = &user
+		userLookup[fmt.Sprintf("S%s", user.SteamID)] = &user
 	}
 
 	entries, err := sgc.GetEntriesForChampionship(id)
@@ -145,11 +147,10 @@ func (sgc *SimGridClient) BuildDriverLookup(id string) (models.DriverLookup, err
 			if driver.FirstName == "" && driver.LastName == "" {
 				continue
 			}
-			name := fmt.Sprintf("%s%s", driver.FirstName, driver.LastName)
-			if _, ok := userLookup[name]; ok {
-				userLookup[name].CarNumber = entry.CarNumber
+			if _, ok := userLookup[driver.PlayerID]; ok {
+				userLookup[driver.PlayerID].CarNumber = entry.CarNumber
 			} else {
-				return nil, fmt.Errorf("Unknown driver: %s", name)
+				return nil, fmt.Errorf("Unknown driver: %#v", driver)
 			}
 		}
 	}
