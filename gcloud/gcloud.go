@@ -15,19 +15,19 @@ import (
 func GenerateBriefing(conf *config.Config, penalties *models.Penalties) (string, error) {
 	briefingFile, err := copyFile(conf.BriefingTemplateDocID, conf.BriefingFolderID, fmt.Sprintf("Drivers Briefing Round %d at %s", conf.NextRound.Number, conf.NextRound.Track))
 	if err != nil {
-		return "", fmt.Errorf("Failed to copy Briefing Template to Briefing folder: %s", err)
+		return "", fmt.Errorf("failed to copy Briefing Template to Briefing folder: %s", err)
 	}
 
 	ctx := context.Background()
 	service, err := docs.NewService(ctx)
 	if err != nil {
-		return "", fmt.Errorf("Failed connecting to Google Docs: %s", err)
+		return "", fmt.Errorf("failed connecting to Google Docs: %s", err)
 	}
 
 	docRequest := service.Documents.Get(briefingFile.Id)
 	briefingDoc, err := docRequest.Do()
 	if err != nil {
-		return "", fmt.Errorf("Failed getting Briefing Doc: %s", err)
+		return "", fmt.Errorf("failed getting Briefing Doc: %s", err)
 	}
 	// json, err := briefingDoc.MarshalJSON()
 	// if err != nil {
@@ -37,13 +37,13 @@ func GenerateBriefing(conf *config.Config, penalties *models.Penalties) (string,
 
 	updates, err := generateUpdates(conf, penalties, briefingDoc)
 	if err != nil {
-		return "", fmt.Errorf("Failed processing Briefing Template: %s", err)
+		return "", fmt.Errorf("failed processing Briefing Template: %s", err)
 	}
 	docUpdateRequest := service.Documents.BatchUpdate(briefingFile.Id, updates)
 
 	_, err = docUpdateRequest.Do()
 	if err != nil {
-		return "", fmt.Errorf("Could not update the Briefing Doc: %s", err)
+		return "", fmt.Errorf("could not update the Briefing Doc: %s", err)
 	}
 
 	return fmt.Sprintf("https://docs.google.com/document/d/%s", briefingFile.Id), nil
@@ -84,7 +84,7 @@ func generateUpdates(conf *config.Config, penalties *models.Penalties, doc *docs
 	}
 
 	if penaltyStartIndex < 0 {
-		return nil, fmt.Errorf("Could not find H3 'Stream' to start inserting penalty data ahead of\n")
+		return nil, fmt.Errorf("could not find H3 'Stream' to start inserting penalty data ahead of")
 	}
 
 	// Pit Starts R2
@@ -131,7 +131,7 @@ func generateUpdates(conf *config.Config, penalties *models.Penalties, doc *docs
 
 	// Now replace all templated text
 	requests = append(requests, replaceText("[num]", fmt.Sprintf("%d", conf.NextRound.Number)))
-	requests = append(requests, replaceText("[Track Name]", fmt.Sprintf("%s", conf.NextRound.Track)))
+	requests = append(requests, replaceText("[Track Name]", conf.NextRound.Track))
 
 	group1 := "ODD"
 	group2 := "EVEN"
@@ -139,8 +139,8 @@ func generateUpdates(conf *config.Config, penalties *models.Penalties, doc *docs
 		group1 = "EVEN"
 		group2 = "ODD"
 	}
-	requests = append(requests, replaceText("[group1]", fmt.Sprintf("%s", group1)))
-	requests = append(requests, replaceText("[group2]", fmt.Sprintf("%s", group2)))
+	requests = append(requests, replaceText("[group1]", group1))
+	requests = append(requests, replaceText("[group2]", group2))
 	requests = append(requests, replaceText("[briefing time]", "7:45PM Eastern/4:45PM Pacific"))
 	requests = append(requests, replaceText("[SEASON]", conf.Season))
 
