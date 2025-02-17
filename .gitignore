@@ -2,3 +2,7 @@
 vendor
 client_secret*
 *.json
+rookies-bot.exe
+.gitignore
+
+winter-round-1.yaml
