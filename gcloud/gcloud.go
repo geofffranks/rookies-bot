@@ -141,7 +141,7 @@ func generateUpdates(conf *config.Config, penalties *models.Penalties, doc *docs
 	}
 	requests = append(requests, replaceText("[group1]", group1))
 	requests = append(requests, replaceText("[group2]", group2))
-	requests = append(requests, replaceText("[briefing time]", "7:45PM Eastern/4:45PM Pacific"))
+	requests = append(requests, replaceText("[briefing time]", "7:30PM Eastern/4:30PM Pacific"))
 	requests = append(requests, replaceText("[SEASON]", conf.Season))
 
 	return &docs.BatchUpdateDocumentRequest{

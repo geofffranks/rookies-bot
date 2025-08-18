@@ -133,7 +133,7 @@ func (d *DiscordClient) briefingTime() (time.Time, error) {
 
 	dayOffset := (time.Monday + 7 - now.Weekday()) % 7
 	targetDate := now.AddDate(0, 0, int(dayOffset))
-	return time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 19, 45, 00, 00, location), nil
+	return time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 19, 30, 00, 00, location), nil
 }
 
 func (d *DiscordClient) getGuild() (snowflake.ID, error) {
