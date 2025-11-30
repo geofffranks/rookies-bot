@@ -100,6 +100,19 @@ func generateUpdates(conf *config.Config, penalties *models.Penalties, doc *docs
 	}
 	requests = append(requests, generateHeading(penaltyStartIndex, "HEADING_4", "Race 2 Pit Starts\n")...)
 
+	// Quali Bans
+	if len(penalties.QualiBansR2CarriedOver)+len(penalties.QualiBansR2) == 0 {
+		requests = append(requests, generatePenaltyEntry(penaltyStartIndex, "None!\n")...)
+	} else {
+		for _, driver := range penalties.QualiBansR2CarriedOver {
+			requests = append(requests, generatePenaltyEntry(penaltyStartIndex, fmt.Sprintf("#%03d - %s %s (carried over)\n", driver.CarNumber, driver.FirstName, driver.LastName))...)
+		}
+		for _, driver := range penalties.QualiBansR2 {
+			requests = append(requests, generatePenaltyEntry(penaltyStartIndex, fmt.Sprintf("#%03d - %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName))...)
+		}
+	}
+	requests = append(requests, generateHeading(penaltyStartIndex, "HEADING_4", "Race 2 Quali Bans\n")...)
+
 	// Pit Starts R1
 	if len(penalties.PitStartsR1CarriedOver)+len(penalties.PitStartsR1) == 0 {
 		requests = append(requests, generatePenaltyEntry(penaltyStartIndex, "None!\n")...)
@@ -114,17 +127,17 @@ func generateUpdates(conf *config.Config, penalties *models.Penalties, doc *docs
 	requests = append(requests, generateHeading(penaltyStartIndex, "HEADING_4", "Race 1 Pit Starts\n")...)
 
 	// Quali Bans
-	if len(penalties.QualiBansCarriedOver)+len(penalties.QualiBans) == 0 {
+	if len(penalties.QualiBansR1CarriedOver)+len(penalties.QualiBansR1) == 0 {
 		requests = append(requests, generatePenaltyEntry(penaltyStartIndex, "None!\n")...)
 	} else {
-		for _, driver := range penalties.QualiBansCarriedOver {
+		for _, driver := range penalties.QualiBansR1CarriedOver {
 			requests = append(requests, generatePenaltyEntry(penaltyStartIndex, fmt.Sprintf("#%03d - %s %s (carried over)\n", driver.CarNumber, driver.FirstName, driver.LastName))...)
 		}
-		for _, driver := range penalties.QualiBans {
+		for _, driver := range penalties.QualiBansR1 {
 			requests = append(requests, generatePenaltyEntry(penaltyStartIndex, fmt.Sprintf("#%03d - %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName))...)
 		}
 	}
-	requests = append(requests, generateHeading(penaltyStartIndex, "HEADING_4", "Quali Bans\n")...)
+	requests = append(requests, generateHeading(penaltyStartIndex, "HEADING_4", "Race 1 Quali Bans\n")...)
 
 	// Penalties Heading
 	requests = append(requests, generateHeading(penaltyStartIndex, "HEADING_3", "Drivers Serving Penalties Tonight\n")...)

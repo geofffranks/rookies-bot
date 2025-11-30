@@ -9,7 +9,8 @@ import (
 )
 
 type Penalty struct {
-	QualiBans   []int `yaml:"quali_bans"`
+	QualiBansR1 []int `yaml:"quali_bans_r1"`
+	QualiBansR2 []int `yaml:"quali_bans_r2"`
 	PitStartsR1 []int `yaml:"pit_starts_r1"`
 	PitStartsR2 []int `yaml:"pit_starts_r2"`
 }

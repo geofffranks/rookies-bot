@@ -196,19 +196,19 @@ func (d *DiscordClient) getDriverId(handle string) (snowflake.ID, error) {
 
 func (d *DiscordClient) generatePenaltyMessage(penalties *models.Penalties) (string, error) {
 	message := `
-**Quali Bans**
+**Quali Bans R1**
 `
-	if len(penalties.QualiBansCarriedOver)+len(penalties.QualiBans) == 0 {
+	if len(penalties.QualiBansR1CarriedOver)+len(penalties.QualiBansR1) == 0 {
 		message += "- None!\n"
 	} else {
-		for _, driver := range penalties.QualiBansCarriedOver {
+		for _, driver := range penalties.QualiBansR1CarriedOver {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
 				return "", err
 			}
 			message += fmt.Sprintf("- <@%s> (carried over)\n", driverId)
 		}
-		for _, driver := range penalties.QualiBans {
+		for _, driver := range penalties.QualiBansR1 {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
 				return "", err
@@ -231,6 +231,27 @@ func (d *DiscordClient) generatePenaltyMessage(penalties *models.Penalties) (str
 			message += fmt.Sprintf("- <@%s> (carried over)\n", driverId)
 		}
 		for _, driver := range penalties.PitStartsR1 {
+			driverId, err := d.getDriverId(driver.DiscordHandle)
+			if err != nil {
+				return "", err
+			}
+			message += fmt.Sprintf("- <@%s>\n", driverId)
+		}
+	}
+	message += `
+**Quali Bans R2**
+`
+	if len(penalties.QualiBansR2CarriedOver)+len(penalties.QualiBansR2) == 0 {
+		message += "- None!\n"
+	} else {
+		for _, driver := range penalties.QualiBansR2CarriedOver {
+			driverId, err := d.getDriverId(driver.DiscordHandle)
+			if err != nil {
+				return "", err
+			}
+			message += fmt.Sprintf("- <@%s> (carried over)\n", driverId)
+		}
+		for _, driver := range penalties.QualiBansR2 {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
 				return "", err

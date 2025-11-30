@@ -152,11 +152,19 @@ func buildPenaltyList(driverLookup models.DriverLookup, conf *config.Config) (*m
 	penalties := models.Penalties{}
 
 	var err error
-	penalties.QualiBans, err = buildPenalizedDriverList(driverLookup, conf.Penalties.QualiBans)
+	penalties.QualiBansR1, err = buildPenalizedDriverList(driverLookup, conf.Penalties.QualiBansR1)
 	if err != nil {
 		return nil, err
 	}
-	penalties.QualiBansCarriedOver, err = buildPenalizedDriverList(driverLookup, conf.CarriedOverPenalties.QualiBans)
+	penalties.QualiBansR1CarriedOver, err = buildPenalizedDriverList(driverLookup, conf.CarriedOverPenalties.QualiBansR1)
+	if err != nil {
+		return nil, err
+	}
+	penalties.QualiBansR2, err = buildPenalizedDriverList(driverLookup, conf.Penalties.QualiBansR2)
+	if err != nil {
+		return nil, err
+	}
+	penalties.QualiBansR2CarriedOver, err = buildPenalizedDriverList(driverLookup, conf.CarriedOverPenalties.QualiBansR2)
 	if err != nil {
 		return nil, err
 	}
