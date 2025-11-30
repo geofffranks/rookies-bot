@@ -177,6 +177,9 @@ func (sgc *SimGridClient) makeRequest(method, url string) (*http.Response, error
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sgc.token))
 
 	resp, err := sgc.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
 	if resp.StatusCode >= 400 {
 		return resp, fmt.Errorf("HTTP request failure: %s", resp.Status)
 	}
