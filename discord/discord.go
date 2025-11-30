@@ -2,6 +2,7 @@ package discord
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/geofffranks/rookies-bot/config"
@@ -14,10 +15,10 @@ import (
 )
 
 type DiscordClient struct {
-	client       bot.Client
-	conf         *config.Config
-	guild        snowflake.ID
-	driverLookup map[string]snowflake.ID
+	client     bot.Client
+	conf       *config.Config
+	guild      snowflake.ID
+	memberList map[string]snowflake.ID
 }
 
 func NewDiscordClient(conf *config.Config) (*DiscordClient, error) {
@@ -27,9 +28,8 @@ func NewDiscordClient(conf *config.Config) (*DiscordClient, error) {
 	}
 
 	return &DiscordClient{
-		conf:         conf,
-		client:       client,
-		driverLookup: map[string]snowflake.ID{},
+		conf:   conf,
+		client: client,
 	}, nil
 }
 
@@ -174,24 +174,37 @@ func (d *DiscordClient) lookupRole(roleName string) (discord.Role, error) {
 }
 
 func (d *DiscordClient) getDriverId(handle string) (snowflake.ID, error) {
-	if id, ok := d.driverLookup[handle]; ok {
-		return id, nil
-	}
-	guildId, err := d.getGuild()
-	if err != nil {
-		return 0, err
+	if d.memberList == nil {
+		d.memberList = map[string]snowflake.ID{}
+
+		guildId, err := d.getGuild()
+		if err != nil {
+			return 0, err
+		}
+
+		var lastUser snowflake.ID
+		for {
+			fmt.Printf("fetching members...\n")
+			members, err := d.client.Rest().GetMembers(guildId, 1000, lastUser)
+			if err != nil {
+				return 0, err
+			}
+			if len(members) == 0 {
+				break
+			}
+			for _, member := range members {
+				normalizedUsername := strings.Replace(strings.ToLower(member.User.Username), ".", "", -1)
+				d.memberList[normalizedUsername] = member.User.ID
+			}
+			lastUser = members[len(members)-1].User.ID
+		}
 	}
 
-	members, err := d.client.Rest().SearchMembers(guildId, handle, 1)
-	if err != nil {
-		return 0, err
+	driver, ok := d.memberList[handle]
+	if !ok {
+		return 0, fmt.Errorf("could not find user %s in guild. check for special characters or league abandonment", handle)
 	}
-	if len(members) != 1 {
-		return 0, fmt.Errorf("unexpected number of members returned from search for %s: %#v", handle, members)
-	}
-
-	d.driverLookup[handle] = members[0].User.ID
-	return d.driverLookup[handle], nil
+	return driver, nil
 }
 
 func (d *DiscordClient) generatePenaltyMessage(penalties *models.Penalties) (string, error) {
