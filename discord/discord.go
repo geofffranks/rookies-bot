@@ -184,7 +184,6 @@ func (d *DiscordClient) getDriverId(handle string) (snowflake.ID, error) {
 
 		var lastUser snowflake.ID
 		for {
-			fmt.Printf("fetching members...\n")
 			members, err := d.client.Rest().GetMembers(guildId, 1000, lastUser)
 			if err != nil {
 				return 0, err
