@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
 
 	"github.com/geofffranks/rookies-bot/config"
@@ -27,7 +29,7 @@ func main() {
 	)
 
 	announcePenalties := func(cCtx *cli.Context) error {
-		penaltyMessage, err := dc.BuildPenaltyMessage(penalties)
+		penaltyMessage, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
 		if err != nil {
 			return fmt.Errorf("failed to generate penalty message: %s", err)
 		}
@@ -48,7 +50,7 @@ func main() {
 			return fmt.Errorf("failed to generate briefing doc: %s", err)
 		}
 
-		briefingMessage, err := dc.BuildBriefingMessage(penalties, briefingDoc)
+		briefingMessage, err := dc.BuildBriefingMessage(penalties, briefingDoc, &conf.RoundConfig)
 		if err != nil {
 			return fmt.Errorf("failed to generate briefingmessage: %s", err)
 		}
@@ -61,7 +63,7 @@ func main() {
 			return fmt.Errorf("failed to pin briefing announcement: %s", err)
 		}
 
-		err = dc.CreateBriefingEvent()
+		err = dc.CreateBriefingEvent(&conf.RoundConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create briefing event: %s", err)
 		}
@@ -91,6 +93,23 @@ func main() {
 		return nil
 	}
 
+	bot := func(cCtx *cli.Context) error {
+		ctx := context.TODO()
+		if err := dc.OpenGateway(ctx); err != nil {
+			return err
+		}
+
+		fmt.Printf("rookies-bot is now running. Press CTRL+C to exit.\n")
+
+		// Block until CTRL+C
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, os.Interrupt)
+		<-stop
+
+		dc.Close(ctx)
+		return nil
+	}
+
 	app := &cli.App{
 		Commands: []*cli.Command{
 			{
@@ -107,6 +126,13 @@ func main() {
 				Args:        true,
 				Action:      raceSetup,
 			},
+			{
+				Name:        "bot",
+				Usage:       "bot",
+				Description: "Starts a long-running discord bot for rookies-bot",
+				Args:        true,
+				Action:      bot,
+			},
 		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Value: "config.yml"},
@@ -116,24 +142,29 @@ func main() {
 			set := flag.NewFlagSet("github.com/geofffranks/rookies-bot", 1)
 			nc := cli.NewContext(cCtx.App, set, cCtx)
 
+			cmd := cCtx.Args().Get(0)
 			roundConfig := cCtx.Args().Get(1)
-			if roundConfig == "" {
-				return fmt.Errorf("bad args")
+			if cmd != "bot" {
+				if roundConfig == "" {
+					return fmt.Errorf("bad args")
+				}
 			}
 			conf, err = config.Load(nc.String("config"), roundConfig)
 			if err != nil {
 				return fmt.Errorf("could not load configs: %s", err)
 			}
-			sgClient = simgrid.NewClient(conf.SimGridApiToken)
+			if cmd != "bot" {
+				sgClient = simgrid.NewClient(conf.SimGridApiToken)
 
-			driverLookup, err = sgClient.BuildDriverLookup(conf.ChampionshipId)
-			if err != nil {
-				log.Fatalf("Failed building driver list: %s\n", err)
-			}
+				driverLookup, err = sgClient.BuildDriverLookup(conf.ChampionshipId)
+				if err != nil {
+					log.Fatalf("Failed building driver list: %s\n", err)
+				}
 
-			penalties, err = buildPenaltyList(driverLookup, conf)
-			if err != nil {
-				return fmt.Errorf("failed penalty summary: %s", err)
+				penalties, err = buildPenaltyList(driverLookup, &conf.RoundConfig)
+				if err != nil {
+					return fmt.Errorf("failed penalty summary: %s", err)
+				}
 			}
 			dc, err = discord.NewDiscordClient(conf)
 			if err != nil {
@@ -148,7 +179,7 @@ func main() {
 	}
 }
 
-func buildPenaltyList(driverLookup models.DriverLookup, conf *config.Config) (*models.Penalties, error) {
+func buildPenaltyList(driverLookup models.DriverLookup, conf *config.RoundConfig) (*models.Penalties, error) {
 	penalties := models.Penalties{}
 
 	var err error

@@ -115,6 +115,7 @@ func generateUpdates(conf *config.Config, penalties *models.Penalties, doc *docs
 
 	// Pit Starts R1
 	if len(penalties.PitStartsR1CarriedOver)+len(penalties.PitStartsR1) == 0 {
+
 		requests = append(requests, generatePenaltyEntry(penaltyStartIndex, "None!\n")...)
 	} else {
 		for _, driver := range penalties.PitStartsR1CarriedOver {

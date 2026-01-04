@@ -40,7 +40,11 @@ type Driver struct {
 }
 
 type Race struct {
-	Track string `json:"track"`
+	Track Track `json:"track"`
+}
+
+type Track struct {
+	Name string `json:"name"`
 }
 
 type Championship struct {
@@ -116,7 +120,7 @@ func (sgc *SimGridClient) GetNextRound(id string, prev config.Round) (*config.Ro
 	nextRoundNum := prev.Number + 1
 	nextTrack := ""
 	if len(championship.Races) >= nextRoundNum {
-		nextTrack = championship.Races[nextRoundNum-1].Track
+		nextTrack = championship.Races[nextRoundNum-1].Track.Name
 	}
 
 	nextRound := config.Round{

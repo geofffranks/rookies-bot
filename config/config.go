@@ -21,6 +21,10 @@ type Round struct {
 	PenaltyTrackerLink string `yaml:"penalty_tracker_link"`
 }
 
+func (r Round) String() string {
+	return fmt.Sprintf("Round %d - %s", r.Number, r.Track)
+}
+
 type BotConfig struct {
 	SimGridApiToken string `yaml:"simgrid_api_token"`
 	ChampionshipId  string `yaml:"championship_id"`
@@ -58,9 +62,11 @@ func Load(botConfigPath, roundConfigPath string) (*Config, error) {
 	}
 
 	roundConfig := &RoundConfig{}
-	err = loadFile(roundConfigPath, roundConfig)
-	if err != nil {
-		return nil, err
+	if roundConfigPath != "" {
+		err = loadFile(roundConfigPath, roundConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	//FIXME: add some validation to the config for empty
@@ -70,6 +76,15 @@ func Load(botConfigPath, roundConfigPath string) (*Config, error) {
 	}
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.GoogleServiceAccountToken)
 	return config, nil
+}
+
+func LoadRoundConfig(content []byte) (*RoundConfig, error) {
+	roundConfig := &RoundConfig{}
+	err := yaml.Unmarshal(content, roundConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Failed parsing YAML data: %s", err)
+	}
+	return roundConfig, nil
 }
 
 func loadFile(file string, config interface{}) error {
