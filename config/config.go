@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/disgoorg/snowflake/v2"
 	"gopkg.in/yaml.v3"
@@ -80,6 +81,9 @@ func Load(botConfigPath, roundConfigPath string) (*Config, error) {
 
 func LoadRoundConfig(content []byte) (*RoundConfig, error) {
 	roundConfig := &RoundConfig{}
+
+	content = []byte(strings.Replace(string(content), "\t", "    ", -1))
+
 	err := yaml.Unmarshal(content, roundConfig)
 	if err != nil {
 		return nil, fmt.Errorf("Failed parsing YAML data: %s", err)

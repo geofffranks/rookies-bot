@@ -84,6 +84,9 @@ func getRoundConfig(event *events.MessageCreate) (*config.RoundConfig, error) {
 	}
 
 	roundConfig, err := config.LoadRoundConfig(fileContent)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse race penalty YAML file: %s", err)
+	}
 
 	return roundConfig, nil
 }
