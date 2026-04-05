@@ -2,6 +2,7 @@ package discord
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,6 +29,23 @@ var adminUsers = []snowflake.ID{
 	371787234187280385, // ralli
 	418087017448996864, // kallil
 	942149076873543721, // geoff
+}
+
+type DiscordHandleNotFoundError struct {
+	Handle string
+}
+
+func (e DiscordHandleNotFoundError) Error() string {
+	return e.String()
+}
+
+func (e DiscordHandleNotFoundError) Is(err error) bool {
+	_, ok := err.(DiscordHandleNotFoundError)
+	return ok
+}
+
+func (e DiscordHandleNotFoundError) String() string {
+	return fmt.Sprintf("could not find user %s in guild. check for special characters or league abandonment", e.Handle)
 }
 
 type DiscordClient struct {
@@ -233,7 +251,7 @@ func (d *DiscordClient) announcePenalties(event *events.MessageCreate) {
 		return
 	}
 
-	msg = fmt.Sprintf("Ok, I have announced penalties from %s in %s", roundConfig.PreviousRound)
+	msg = fmt.Sprintf("Ok, I have announced penalties from %s", roundConfig.PreviousRound)
 }
 
 func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
@@ -529,7 +547,7 @@ func (d *DiscordClient) getDriverId(handle string) (snowflake.ID, error) {
 
 	driver, ok := d.memberList[handle]
 	if !ok {
-		return 0, fmt.Errorf("could not find user %s in guild. check for special characters or league abandonment", handle)
+		return 0, DiscordHandleNotFoundError{Handle: handle}
 	}
 	return driver, nil
 }
@@ -544,14 +562,24 @@ func (d *DiscordClient) generatePenaltyMessage(penalties *models.Penalties, conf
 		for _, driver := range penalties.QualiBansR1CarriedOver {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
-				return "", err
+				if errors.Is(err, DiscordHandleNotFoundError{}) {
+					message += fmt.Sprintf("- #%d %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName)
+					continue
+				} else {
+					return "", err
+				}
 			}
 			message += fmt.Sprintf("- <@%s> (carried over)\n", driverId)
 		}
 		for _, driver := range penalties.QualiBansR1 {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
-				return "", err
+				if errors.Is(err, DiscordHandleNotFoundError{}) {
+					message += fmt.Sprintf("- #%d %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName)
+					continue
+				} else {
+					return "", err
+				}
 			}
 			message += fmt.Sprintf("- <@%s>\n", driverId)
 		}
@@ -566,14 +594,24 @@ func (d *DiscordClient) generatePenaltyMessage(penalties *models.Penalties, conf
 		for _, driver := range penalties.PitStartsR1CarriedOver {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
-				return "", err
+				if errors.Is(err, DiscordHandleNotFoundError{}) {
+					message += fmt.Sprintf("- #%d %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName)
+					continue
+				} else {
+					return "", err
+				}
 			}
 			message += fmt.Sprintf("- <@%s> (carried over)\n", driverId)
 		}
 		for _, driver := range penalties.PitStartsR1 {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
-				return "", err
+				if errors.Is(err, DiscordHandleNotFoundError{}) {
+					message += fmt.Sprintf("- #%d %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName)
+					continue
+				} else {
+					return "", err
+				}
 			}
 			message += fmt.Sprintf("- <@%s>\n", driverId)
 		}
@@ -587,14 +625,24 @@ func (d *DiscordClient) generatePenaltyMessage(penalties *models.Penalties, conf
 		for _, driver := range penalties.QualiBansR2CarriedOver {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
-				return "", err
+				if errors.Is(err, DiscordHandleNotFoundError{}) {
+					message += fmt.Sprintf("- #%d %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName)
+					continue
+				} else {
+					return "", err
+				}
 			}
 			message += fmt.Sprintf("- <@%s> (carried over)\n", driverId)
 		}
 		for _, driver := range penalties.QualiBansR2 {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
-				return "", err
+				if errors.Is(err, DiscordHandleNotFoundError{}) {
+					message += fmt.Sprintf("- #%d %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName)
+					continue
+				} else {
+					return "", err
+				}
 			}
 			message += fmt.Sprintf("- <@%s>\n", driverId)
 		}
@@ -609,14 +657,24 @@ func (d *DiscordClient) generatePenaltyMessage(penalties *models.Penalties, conf
 		for _, driver := range penalties.PitStartsR2CarriedOver {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
-				return "", err
+				if errors.Is(err, DiscordHandleNotFoundError{}) {
+					message += fmt.Sprintf("- #%d %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName)
+					continue
+				} else {
+					return "", err
+				}
 			}
 			message += fmt.Sprintf("- <@%s> (carried over)\n", driverId)
 		}
 		for _, driver := range penalties.PitStartsR2 {
 			driverId, err := d.getDriverId(driver.DiscordHandle)
 			if err != nil {
-				return "", err
+				if errors.Is(err, DiscordHandleNotFoundError{}) {
+					message += fmt.Sprintf("- #%d %s %s\n", driver.CarNumber, driver.FirstName, driver.LastName)
+					continue
+				} else {
+					return "", err
+				}
 			}
 			message += fmt.Sprintf("- <@%s>\n", driverId)
 		}

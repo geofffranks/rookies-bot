@@ -86,7 +86,7 @@ func LoadRoundConfig(content []byte) (*RoundConfig, error) {
 
 	err := yaml.Unmarshal(content, roundConfig)
 	if err != nil {
-		return nil, fmt.Errorf("Failed parsing YAML data: %s", err)
+		return nil, fmt.Errorf("Failed parsing YAML data: %s. Use something like https://yaml-online-parser.appspot.com to find the syntax error and try again.", err)
 	}
 	return roundConfig, nil
 }
