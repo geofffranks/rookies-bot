@@ -325,6 +325,114 @@ var _ = Describe("BuildPenaltyMessage", func() {
 		// not 4 times (2 pages × 2 calls)
 		Expect(fakeRest.GetMembersCallCount()).To(Equal(2))
 	})
+
+	It("includes pit starts R1 in the message", func() {
+		penalties := &models.Penalties{
+			PitStartsR1: []models.Driver{
+				{FirstName: "Max", LastName: "V", CarNumber: 42, DiscordHandle: "maxv"},
+			},
+		}
+		msg, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("Pit Starts R1"))
+		Expect(msg.Content).To(ContainSubstring("<@"))
+	})
+
+	It("includes pit starts R1 carried-over as '(carried over)'", func() {
+		callCount := 0
+		fakeRest6 := new(fakes.FakeBotRestClient)
+		fakeRest6.GetChannelStub = func(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error) {
+			return newGuildTextChannel(channelID, snowflake.ID(777)), nil
+		}
+		fakeRest6.GetMembersStub = func(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error) {
+			callCount++
+			if callCount == 1 {
+				return []dgo.Member{{User: dgo.User{ID: snowflake.ID(1001), Username: "maxv"}}}, nil
+			}
+			return []dgo.Member{}, nil
+		}
+		dc6 := newTestClient(fakeRest6, conf)
+		penalties := &models.Penalties{
+			PitStartsR1CarriedOver: []models.Driver{
+				{FirstName: "Max", LastName: "V", CarNumber: 42, DiscordHandle: "maxv"},
+			},
+		}
+		msg, err := dc6.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("carried over"))
+	})
+
+	It("includes quali bans R2 in the message", func() {
+		penalties := &models.Penalties{
+			QualiBansR2: []models.Driver{
+				{FirstName: "Max", LastName: "V", CarNumber: 42, DiscordHandle: "maxv"},
+			},
+		}
+		msg, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("Quali Bans R2"))
+		Expect(msg.Content).To(ContainSubstring("<@"))
+	})
+
+	It("includes quali bans R2 carried-over as '(carried over)'", func() {
+		callCount := 0
+		fakeRest7 := new(fakes.FakeBotRestClient)
+		fakeRest7.GetChannelStub = func(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error) {
+			return newGuildTextChannel(channelID, snowflake.ID(777)), nil
+		}
+		fakeRest7.GetMembersStub = func(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error) {
+			callCount++
+			if callCount == 1 {
+				return []dgo.Member{{User: dgo.User{ID: snowflake.ID(1001), Username: "maxv"}}}, nil
+			}
+			return []dgo.Member{}, nil
+		}
+		dc7 := newTestClient(fakeRest7, conf)
+		penalties := &models.Penalties{
+			QualiBansR2CarriedOver: []models.Driver{
+				{FirstName: "Max", LastName: "V", CarNumber: 42, DiscordHandle: "maxv"},
+			},
+		}
+		msg, err := dc7.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("carried over"))
+	})
+
+	It("includes pit starts R2 in the message", func() {
+		penalties := &models.Penalties{
+			PitStartsR2: []models.Driver{
+				{FirstName: "Max", LastName: "V", CarNumber: 42, DiscordHandle: "maxv"},
+			},
+		}
+		msg, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("Pit Starts R2"))
+		Expect(msg.Content).To(ContainSubstring("<@"))
+	})
+
+	It("includes pit starts R2 carried-over as '(carried over)'", func() {
+		callCount := 0
+		fakeRest8 := new(fakes.FakeBotRestClient)
+		fakeRest8.GetChannelStub = func(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error) {
+			return newGuildTextChannel(channelID, snowflake.ID(777)), nil
+		}
+		fakeRest8.GetMembersStub = func(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error) {
+			callCount++
+			if callCount == 1 {
+				return []dgo.Member{{User: dgo.User{ID: snowflake.ID(1001), Username: "maxv"}}}, nil
+			}
+			return []dgo.Member{}, nil
+		}
+		dc8 := newTestClient(fakeRest8, conf)
+		penalties := &models.Penalties{
+			PitStartsR2CarriedOver: []models.Driver{
+				{FirstName: "Max", LastName: "V", CarNumber: 42, DiscordHandle: "maxv"},
+			},
+		}
+		msg, err := dc8.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("carried over"))
+	})
 })
 
 var _ = Describe("CreateBriefingEvent", func() {
