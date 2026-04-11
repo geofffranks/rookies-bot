@@ -357,6 +357,93 @@ var _ = Describe("SendMessage", func() {
 	})
 })
 
+var _ = Describe("BuildBriefingMessage", func() {
+	var (
+		fakeRest *fakes.FakeBotRestClient
+		conf     *config.Config
+		dc       *discord.DiscordClient
+	)
+
+	BeforeEach(func() {
+		fakeRest = new(fakes.FakeBotRestClient)
+		conf = &config.Config{
+			BotConfig: config.BotConfig{
+				DiscordChannelId:         snowflake.ID(111),
+				DiscordBriefingChannelId: snowflake.ID(222),
+				DiscordRoleName:          "Rookies",
+			},
+			RoundConfig: config.RoundConfig{
+				NextRound:     config.Round{Number: 5, Track: "Monza"},
+				PreviousRound: config.Round{Number: 4, Track: "Spa", PenaltyTrackerLink: "https://example.com/tracker"},
+			},
+		}
+		dc = newTestClient(fakeRest, conf)
+
+		fakeRest.GetChannelStub = func(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error) {
+			return newGuildTextChannel(channelID, snowflake.ID(777)), nil
+		}
+		fakeRest.GetRolesReturns([]dgo.Role{{Name: "Rookies", ID: snowflake.ID(500)}}, nil)
+		fakeRest.GetMembersReturns([]dgo.Member{}, nil)
+	})
+
+	It("includes a role mention in the message", func() {
+		penalties := &models.Penalties{}
+		msg, err := dc.BuildBriefingMessage(penalties, "https://docs.google.com/briefing", &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("<@&500>"))
+	})
+
+	It("includes the briefing doc URL", func() {
+		penalties := &models.Penalties{}
+		msg, err := dc.BuildBriefingMessage(penalties, "https://docs.google.com/briefing", &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("https://docs.google.com/briefing"))
+	})
+
+	It("includes the next round number", func() {
+		penalties := &models.Penalties{}
+		msg, err := dc.BuildBriefingMessage(penalties, "https://example.com/doc", &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("Round 5"))
+	})
+
+	It("includes the penalty tracker link", func() {
+		penalties := &models.Penalties{}
+		msg, err := dc.BuildBriefingMessage(penalties, "https://example.com/doc", &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("https://example.com/tracker"))
+	})
+
+	It("includes a briefing timestamp marker", func() {
+		penalties := &models.Penalties{}
+		msg, err := dc.BuildBriefingMessage(penalties, "https://example.com/doc", &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("<t:"))
+	})
+
+	It("returns error when the role is not found", func() {
+		fakeRest.GetRolesReturns([]dgo.Role{{Name: "OtherRole", ID: snowflake.ID(501)}}, nil)
+		penalties := &models.Penalties{}
+		_, err := dc.BuildBriefingMessage(penalties, "https://example.com/doc", &conf.RoundConfig)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("Rookies"))
+	})
+
+	It("returns error when GetRoles fails", func() {
+		fakeRest.GetRolesReturns(nil, &errorMsg{msg: "roles API error"})
+		penalties := &models.Penalties{}
+		_, err := dc.BuildBriefingMessage(penalties, "https://example.com/doc", &conf.RoundConfig)
+		Expect(err).To(MatchError("roles API error"))
+	})
+
+	It("returns error when GetChannel fails", func() {
+		fakeRest.GetChannelReturns(nil, &errorMsg{msg: "channel error"})
+		penalties := &models.Penalties{}
+		_, err := dc.BuildBriefingMessage(penalties, "https://example.com/doc", &conf.RoundConfig)
+		Expect(err).To(MatchError("channel error"))
+	})
+})
+
 type errorMsg struct {
 	msg string
 }
