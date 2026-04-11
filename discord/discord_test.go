@@ -238,6 +238,93 @@ var _ = Describe("BuildPenaltyMessage", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(msg.Content).To(ContainSubstring("https://example.com/tracker"))
 	})
+
+	It("normalizes username by lowercasing and removing dots", func() {
+		fakeRest4 := new(fakes.FakeBotRestClient)
+		fakeRest4.GetChannelStub = func(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error) {
+			return newGuildTextChannel(channelID, snowflake.ID(777)), nil
+		}
+		callCount4 := 0
+		fakeRest4.GetMembersStub = func(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error) {
+			callCount4++
+			if callCount4 == 1 {
+				// Username has uppercase and dots — should be normalized to "max.verstappen" -> "maxverstappen"
+				return []dgo.Member{
+					{User: dgo.User{ID: snowflake.ID(2001), Username: "Max.Verstappen"}},
+				}, nil
+			}
+			return []dgo.Member{}, nil
+		}
+		dc4 := newTestClient(fakeRest4, conf)
+
+		penalties := &models.Penalties{
+			QualiBansR1: []models.Driver{
+				{FirstName: "Max", LastName: "V", CarNumber: 33, DiscordHandle: "maxverstappen"},
+			},
+		}
+		msg, err := dc4.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		// Found via normalized username — should be a mention, not a fallback
+		Expect(msg.Content).To(ContainSubstring("<@2001>"))
+	})
+
+	It("paginates through members when first page is full", func() {
+		fakeRest5 := new(fakes.FakeBotRestClient)
+		fakeRest5.GetChannelStub = func(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error) {
+			return newGuildTextChannel(channelID, snowflake.ID(777)), nil
+		}
+		callCount5 := 0
+		fakeRest5.GetMembersStub = func(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error) {
+			callCount5++
+			switch callCount5 {
+			case 1:
+				// First page: 2 members; pagination continues because len > 0
+				return []dgo.Member{
+					{User: dgo.User{ID: snowflake.ID(3001), Username: "driverone"}},
+					{User: dgo.User{ID: snowflake.ID(3002), Username: "drivertwo"}},
+				}, nil
+			case 2:
+				// Second page: 1 more member
+				return []dgo.Member{
+					{User: dgo.User{ID: snowflake.ID(3003), Username: "driverthree"}},
+				}, nil
+			default:
+				// Third call: empty — stops pagination
+				return []dgo.Member{}, nil
+			}
+		}
+		dc5 := newTestClient(fakeRest5, conf)
+
+		penalties := &models.Penalties{
+			QualiBansR1: []models.Driver{
+				{FirstName: "D", LastName: "Three", CarNumber: 3, DiscordHandle: "driverthree"},
+			},
+		}
+		msg, err := dc5.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg.Content).To(ContainSubstring("<@3003>"))
+		// Pagination should have iterated: 3 GetMembers calls (page1, page2, empty)
+		Expect(fakeRest5.GetMembersCallCount()).To(Equal(3))
+	})
+
+	It("uses the cached member list on a second call", func() {
+		penalties := &models.Penalties{
+			QualiBansR1: []models.Driver{
+				{FirstName: "Max", LastName: "V", CarNumber: 42, DiscordHandle: "maxv"},
+			},
+		}
+		// First call builds the memberList cache
+		_, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Second call should reuse the cache
+		_, err = dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		// GetMembers should be called only 2 times total (page1 + empty page from first BuildPenaltyMessage)
+		// not 4 times (2 pages × 2 calls)
+		Expect(fakeRest.GetMembersCallCount()).To(Equal(2))
+	})
 })
 
 var _ = Describe("CreateBriefingEvent", func() {
