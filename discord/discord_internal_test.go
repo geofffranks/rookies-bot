@@ -3,6 +3,8 @@ package discord
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/geofffranks/rookies-bot/config"
@@ -232,5 +234,36 @@ var _ = Describe("buildPenaltyList", func() {
 		roundConfig.CarriedOverPenalties.PitStartsR2 = []int{999}
 		_, err := buildPenaltyList(driverLookup, roundConfig)
 		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("downloadAttachment", func() {
+	It("returns the response body on success", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("penalty: yaml content here"))
+		}))
+		defer server.Close()
+
+		content, err := downloadAttachment(server.URL)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(content).To(Equal([]byte("penalty: yaml content here")))
+	})
+
+	It("returns an error when the server is unreachable", func() {
+		// Port 1 is privileged and never listening
+		_, err := downloadAttachment("http://127.0.0.1:1")
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns an empty body for a 200 response with no content", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		content, err := downloadAttachment(server.URL)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(content).To(BeEmpty())
 	})
 })
