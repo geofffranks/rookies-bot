@@ -4,9 +4,15 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/disgoorg/snowflake/v2"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+// snowflakeID converts a uint64 to snowflake.ID for test readability.
+func snowflakeID(n uint64) snowflake.ID {
+	return snowflake.ID(n)
+}
 
 var _ = Describe("DiscordHandleNotFoundError", func() {
 	It("Error() returns a string containing the handle", func() {
@@ -42,5 +48,21 @@ var _ = Describe("DiscordHandleNotFoundError", func() {
 	It("errors.Is returns false for unrelated errors", func() {
 		err := fmt.Errorf("some other error")
 		Expect(errors.Is(err, DiscordHandleNotFoundError{})).To(BeFalse())
+	})
+})
+
+var _ = Describe("isAllowedUser", func() {
+	DescribeTable("returns true for known admin IDs",
+		func(id uint64) {
+			Expect(isAllowedUser(snowflakeID(id))).To(BeTrue())
+		},
+		Entry("porkchop", uint64(208972532068515840)),
+		Entry("ralli", uint64(371787234187280385)),
+		Entry("kallil", uint64(418087017448996864)),
+		Entry("geoff", uint64(942149076873543721)),
+	)
+
+	It("returns false for a non-admin user ID", func() {
+		Expect(isAllowedUser(snowflakeID(999999999))).To(BeFalse())
 	})
 })
