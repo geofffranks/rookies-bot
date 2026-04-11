@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/disgoorg/snowflake/v2"
+	"github.com/geofffranks/rookies-bot/config"
 	"github.com/geofffranks/rookies-bot/models"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -109,5 +110,127 @@ var _ = Describe("buildPenalizedDriverList", func() {
 		_, err := buildPenalizedDriverList(driverLookup, []int{42, 99})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("99"))
+	})
+})
+
+var _ = Describe("buildPenaltyList", func() {
+	var (
+		driverLookup models.DriverLookup
+		roundConfig  *config.RoundConfig
+	)
+
+	BeforeEach(func() {
+		driverLookup = models.DriverLookup{
+			1: {CarNumber: 1, DiscordHandle: "d1"},
+			2: {CarNumber: 2, DiscordHandle: "d2"},
+			3: {CarNumber: 3, DiscordHandle: "d3"},
+			4: {CarNumber: 4, DiscordHandle: "d4"},
+			5: {CarNumber: 5, DiscordHandle: "d5"},
+			6: {CarNumber: 6, DiscordHandle: "d6"},
+			7: {CarNumber: 7, DiscordHandle: "d7"},
+			8: {CarNumber: 8, DiscordHandle: "d8"},
+		}
+		roundConfig = &config.RoundConfig{
+			Penalties: config.Penalty{
+				QualiBansR1: []int{1},
+				QualiBansR2: []int{2},
+				PitStartsR1: []int{3},
+				PitStartsR2: []int{4},
+			},
+			CarriedOverPenalties: config.Penalty{
+				QualiBansR1: []int{5},
+				QualiBansR2: []int{6},
+				PitStartsR1: []int{7},
+				PitStartsR2: []int{8},
+			},
+		}
+	})
+
+	It("populates all 8 penalty fields correctly", func() {
+		penalties, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(penalties.QualiBansR1).To(HaveLen(1))
+		Expect(penalties.QualiBansR1[0].CarNumber).To(Equal(1))
+
+		Expect(penalties.QualiBansR2).To(HaveLen(1))
+		Expect(penalties.QualiBansR2[0].CarNumber).To(Equal(2))
+
+		Expect(penalties.PitStartsR1).To(HaveLen(1))
+		Expect(penalties.PitStartsR1[0].CarNumber).To(Equal(3))
+
+		Expect(penalties.PitStartsR2).To(HaveLen(1))
+		Expect(penalties.PitStartsR2[0].CarNumber).To(Equal(4))
+
+		Expect(penalties.QualiBansR1CarriedOver).To(HaveLen(1))
+		Expect(penalties.QualiBansR1CarriedOver[0].CarNumber).To(Equal(5))
+
+		Expect(penalties.QualiBansR2CarriedOver).To(HaveLen(1))
+		Expect(penalties.QualiBansR2CarriedOver[0].CarNumber).To(Equal(6))
+
+		Expect(penalties.PitStartsR1CarriedOver).To(HaveLen(1))
+		Expect(penalties.PitStartsR1CarriedOver[0].CarNumber).To(Equal(7))
+
+		Expect(penalties.PitStartsR2CarriedOver).To(HaveLen(1))
+		Expect(penalties.PitStartsR2CarriedOver[0].CarNumber).To(Equal(8))
+	})
+
+	It("returns empty penalty slices when config has no car numbers", func() {
+		roundConfig = &config.RoundConfig{}
+		penalties, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(penalties.QualiBansR1).To(BeNil())
+		Expect(penalties.QualiBansR2).To(BeNil())
+		Expect(penalties.PitStartsR1).To(BeNil())
+		Expect(penalties.PitStartsR2).To(BeNil())
+	})
+
+	It("returns error when QualiBansR1 has unknown car number", func() {
+		roundConfig.Penalties.QualiBansR1 = []int{999}
+		_, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("999"))
+	})
+
+	It("returns error when QualiBansR2 has unknown car number", func() {
+		roundConfig.Penalties.QualiBansR2 = []int{999}
+		_, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns error when PitStartsR1 has unknown car number", func() {
+		roundConfig.Penalties.PitStartsR1 = []int{999}
+		_, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns error when PitStartsR2 has unknown car number", func() {
+		roundConfig.Penalties.PitStartsR2 = []int{999}
+		_, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns error when QualiBansR1CarriedOver has unknown car number", func() {
+		roundConfig.CarriedOverPenalties.QualiBansR1 = []int{999}
+		_, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns error when QualiBansR2CarriedOver has unknown car number", func() {
+		roundConfig.CarriedOverPenalties.QualiBansR2 = []int{999}
+		_, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns error when PitStartsR1CarriedOver has unknown car number", func() {
+		roundConfig.CarriedOverPenalties.PitStartsR1 = []int{999}
+		_, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns error when PitStartsR2CarriedOver has unknown car number", func() {
+		roundConfig.CarriedOverPenalties.PitStartsR2 = []int{999}
+		_, err := buildPenaltyList(driverLookup, roundConfig)
+		Expect(err).To(HaveOccurred())
 	})
 })
