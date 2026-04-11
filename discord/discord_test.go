@@ -281,6 +281,41 @@ var _ = Describe("CreateBriefingEvent", func() {
 		Expect(scheduledTime.Hour()).To(Equal(19))
 		Expect(scheduledTime.Minute()).To(Equal(30))
 	})
+
+	It("returns error when GetChannel fails", func() {
+		fakeRest.GetChannelReturns(nil, &errorMsg{msg: "channel not found"})
+		err := dc.CreateBriefingEvent(&conf.RoundConfig)
+		Expect(err).To(MatchError("channel not found"))
+	})
+
+	It("returns error when CreateGuildScheduledEvent fails", func() {
+		fakeRest.CreateGuildScheduledEventReturns(nil, &errorMsg{msg: "event creation failed"})
+		err := dc.CreateBriefingEvent(&conf.RoundConfig)
+		Expect(err).To(MatchError("event creation failed"))
+	})
+
+	It("does not call GetChannel a second time when guild is already cached", func() {
+		fakeRest.CreateGuildScheduledEventReturns(&dgo.GuildScheduledEvent{}, nil)
+
+		err := dc.CreateBriefingEvent(&conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+		err = dc.CreateBriefingEvent(&conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(fakeRest.GetChannelCallCount()).To(Equal(1))
+	})
+
+	It("includes the round number and track in the event name", func() {
+		fakeRest.CreateGuildScheduledEventReturns(&dgo.GuildScheduledEvent{}, nil)
+
+		err := dc.CreateBriefingEvent(&conf.RoundConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(fakeRest.CreateGuildScheduledEventCallCount()).To(Equal(1))
+		_, eventCreate, _ := fakeRest.CreateGuildScheduledEventArgsForCall(0)
+		Expect(eventCreate.Name).To(ContainSubstring("5"))
+		Expect(eventCreate.Name).To(ContainSubstring("Monza"))
+	})
 })
 
 var _ = Describe("SendMessage", func() {
