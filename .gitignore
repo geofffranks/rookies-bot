@@ -1,5 +1,4 @@
 *.yml
-vendor
 client_secret*
 *.json
 rookies-bot.exe
