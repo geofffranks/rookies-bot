@@ -433,6 +433,23 @@ var _ = Describe("BuildPenaltyMessage", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(msg.Content).To(ContainSubstring("carried over"))
 	})
+
+	It("returns error when GetMembers fails during driver lookup", func() {
+		fakeRest9 := new(fakes.FakeBotRestClient)
+		fakeRest9.GetChannelStub = func(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error) {
+			return newGuildTextChannel(channelID, snowflake.ID(777)), nil
+		}
+		fakeRest9.GetMembersReturns(nil, &errorMsg{msg: "members API error"})
+		dc9 := newTestClient(fakeRest9, conf)
+
+		penalties := &models.Penalties{
+			QualiBansR1: []models.Driver{
+				{FirstName: "Max", LastName: "V", CarNumber: 42, DiscordHandle: "maxv"},
+			},
+		}
+		_, err := dc9.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+		Expect(err).To(MatchError("members API error"))
+	})
 })
 
 var _ = Describe("CreateBriefingEvent", func() {
