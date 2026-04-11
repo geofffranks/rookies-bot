@@ -1,6 +1,8 @@
 package discord
 
 import (
+	"context"
+
 	dgo "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
@@ -18,4 +20,10 @@ type BotRestClient interface {
 	GetRoles(guildID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Role, error)
 	GetMembers(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error)
 	CreateGuildScheduledEvent(guildID snowflake.ID, guildScheduledEventCreate dgo.GuildScheduledEventCreate, opts ...rest.RequestOpt) (*dgo.GuildScheduledEvent, error)
+}
+
+//counterfeiter:generate . BotDiscordClient
+type BotDiscordClient interface {
+	OpenGateway(ctx context.Context) error
+	Close(ctx context.Context)
 }
