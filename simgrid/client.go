@@ -13,16 +13,16 @@ import (
 type SimGridClient struct {
 	token      string
 	httpClient *http.Client
+	BaseURL    string
 }
 
 func NewClient(apitoken string) *SimGridClient {
 	return &SimGridClient{
 		token:      apitoken,
 		httpClient: &http.Client{},
+		BaseURL:    "https://www.thesimgrid.com/api/v1",
 	}
 }
-
-var baseUrl = "https://www.thesimgrid.com/api/v1"
 
 type EntryListResp struct {
 	Entries []Entry `json:"entries"`
@@ -172,7 +172,7 @@ func (sgc *SimGridClient) BuildDriverLookup(id string) (models.DriverLookup, err
 }
 
 func (sgc *SimGridClient) makeRequest(method, url string) (*http.Response, error) {
-	toReq := fmt.Sprintf("%s%s", baseUrl, url)
+	toReq := fmt.Sprintf("%s%s", sgc.BaseURL, url)
 	req, err := http.NewRequest(method, toReq, nil)
 	if err != nil {
 		return nil, err
