@@ -26,6 +26,7 @@ func main() {
 		penalties    *models.Penalties
 		driverLookup models.DriverLookup
 		dc           *discord.DiscordClient
+		gc           *gcloud.Client
 	)
 
 	announcePenalties := func(cCtx *cli.Context) error {
@@ -45,7 +46,7 @@ func main() {
 	}
 
 	raceSetup := func(cCtx *cli.Context) error {
-		briefingDoc, err := gcloud.GenerateBriefing(conf, penalties)
+		briefingDoc, err := gc.GenerateBriefing(conf, penalties)
 		if err != nil {
 			return fmt.Errorf("failed to generate briefing doc: %s", err)
 		}
@@ -69,7 +70,7 @@ func main() {
 		}
 
 		if conf.NextRound.Track != "" {
-			nextRoundConfig, err := generateNextRoundConfig(sgClient, conf, penalties)
+			nextRoundConfig, err := generateNextRoundConfig(sgClient, gc, conf, penalties)
 			if err != nil {
 				return fmt.Errorf("failed to generate config for next round: %s", err)
 			}
@@ -153,6 +154,10 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("could not load configs: %s", err)
 			}
+			gc, err = gcloud.NewClient(cCtx.Context)
+			if err != nil {
+				return fmt.Errorf("failed to connect to Google APIs: %s", err)
+			}
 			if cmd != "bot" {
 				sgClient = simgrid.NewClient(conf.SimGridApiToken)
 
@@ -166,7 +171,7 @@ func main() {
 					return fmt.Errorf("failed penalty summary: %s", err)
 				}
 			}
-			dc, err = discord.NewDiscordClient(conf)
+			dc, err = discord.NewDiscordClient(conf, gc)
 			if err != nil {
 				return fmt.Errorf("failed to connect to discord: %s", err)
 			}
@@ -232,13 +237,13 @@ func buildPenalizedDriverList(driverLookup models.DriverLookup, carNumbers []int
 	return driverList, nil
 }
 
-func generateNextRoundConfig(sgc *simgrid.SimGridClient, conf *config.Config, penalties *models.Penalties) (*config.RoundConfig, error) {
+func generateNextRoundConfig(sgc *simgrid.SimGridClient, gc *gcloud.Client, conf *config.Config, penalties *models.Penalties) (*config.RoundConfig, error) {
 	nextRound, err := sgc.GetNextRound(conf.ChampionshipId, conf.NextRound)
 	if err != nil {
 		return nil, fmt.Errorf("failed getting details for next round: %s", err)
 	}
 
-	nextRoundTracker, err := gcloud.GeneratePenaltyTracker(conf)
+	nextRoundTracker, err := gc.GeneratePenaltyTracker(conf)
 	if err != nil {
 		return nil, fmt.Errorf("failed generating penalty tracker for next round: %s", err)
 	}

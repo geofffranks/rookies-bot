@@ -53,6 +53,7 @@ type DiscordClient struct {
 	conf       *config.Config
 	guild      snowflake.ID
 	memberList map[string]snowflake.ID
+	gcloud     *gcloud.Client
 }
 
 func downloadAttachment(url string) ([]byte, error) {
@@ -66,13 +67,13 @@ func downloadAttachment(url string) ([]byte, error) {
 	return content, err
 }
 
-func generateNextRoundConfig(sgc *simgrid.SimGridClient, conf *config.Config, penalties *models.Penalties) (*config.RoundConfig, error) {
+func generateNextRoundConfig(sgc *simgrid.SimGridClient, gc *gcloud.Client, conf *config.Config, penalties *models.Penalties) (*config.RoundConfig, error) {
 	nextRound, err := sgc.GetNextRound(conf.ChampionshipId, conf.NextRound)
 	if err != nil {
 		return nil, fmt.Errorf("failed getting details for next round: %s", err)
 	}
 
-	nextRoundTracker, err := gcloud.GeneratePenaltyTracker(conf)
+	nextRoundTracker, err := gc.GeneratePenaltyTracker(conf)
 	if err != nil {
 		return nil, fmt.Errorf("failed generating penalty tracker for next round: %s", err)
 	}
@@ -284,7 +285,7 @@ func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
 		RoundConfig: *roundConfig,
 		BotConfig:   d.conf.BotConfig,
 	}
-	briefingDoc, err := gcloud.GenerateBriefing(bigConfig, penalties)
+	briefingDoc, err := d.gcloud.GenerateBriefing(bigConfig, penalties)
 	if err != nil {
 		msg = fmt.Sprintf("failed to generate briefing doc: %s", err)
 		return
@@ -293,7 +294,7 @@ func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
 	var nextConfigFileName string
 	var nextRoundConfig *config.RoundConfig
 	if roundConfig.NextRound.Track != "" {
-		nextRoundConfig, err = generateNextRoundConfig(sgClient, bigConfig, penalties)
+		nextRoundConfig, err = generateNextRoundConfig(sgClient, d.gcloud, bigConfig, penalties)
 		if err != nil {
 			msg = fmt.Sprintf("failed to generate config for next round: %s", err)
 			return
@@ -351,7 +352,7 @@ func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
 	attachment = nextConfigFileName
 }
 
-func NewDiscordClient(conf *config.Config) (*DiscordClient, error) {
+func NewDiscordClient(conf *config.Config, gc *gcloud.Client) (*DiscordClient, error) {
 	client, err := disgo.New(conf.DiscordToken, bot.WithGatewayConfigOpts(
 		gateway.WithIntents(gateway.IntentMessageContent, gateway.IntentDirectMessages),
 	))
@@ -362,6 +363,7 @@ func NewDiscordClient(conf *config.Config) (*DiscordClient, error) {
 	dc := &DiscordClient{
 		conf:   conf,
 		client: client,
+		gcloud: gc,
 	}
 
 	client.AddEventListeners(bot.NewListenerFunc(dc.onMessageCreate))

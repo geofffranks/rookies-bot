@@ -12,36 +12,71 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-func GenerateBriefing(conf *config.Config, penalties *models.Penalties) (string, error) {
-	briefingFile, err := copyFile(conf.BriefingTemplateDocID, conf.BriefingFolderID, fmt.Sprintf("Drivers Briefing Round %d at %s", conf.NextRound.Number, conf.NextRound.Track))
+// Client holds injectable service dependencies for Google API calls.
+type Client struct {
+	Docs  DocsServicer
+	Drive DriveServicer
+}
+
+// NewClient creates a Client using real Google API credentials from the environment.
+func NewClient(ctx context.Context) (*Client, error) {
+	docsService, err := docs.NewService(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed connecting to Google Docs: %s", err)
+	}
+	driveService, err := drive.NewService(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed connecting to Google Drive: %s", err)
+	}
+	return &Client{
+		Docs:  &realDocsService{svc: docsService},
+		Drive: &realDriveService{svc: driveService},
+	}, nil
+}
+
+// --- Real adapters (wrap the Google SDK) ---
+
+type realDocsService struct{ svc *docs.Service }
+
+func (r *realDocsService) GetDocument(ctx context.Context, id string) (*docs.Document, error) {
+	return r.svc.Documents.Get(id).Context(ctx).Do()
+}
+
+func (r *realDocsService) BatchUpdateDocument(ctx context.Context, id string, req *docs.BatchUpdateDocumentRequest) (*docs.BatchUpdateDocumentResponse, error) {
+	return r.svc.Documents.BatchUpdate(id, req).Context(ctx).Do()
+}
+
+type realDriveService struct{ svc *drive.Service }
+
+func (r *realDriveService) CopyFile(ctx context.Context, templateID, folderID, title string) (*drive.File, error) {
+	return r.svc.Files.Copy(templateID, &drive.File{
+		Name:    title,
+		Parents: []string{folderID},
+	}).Context(ctx).Do()
+}
+
+// --- Methods ---
+
+func (c *Client) GenerateBriefing(conf *config.Config, penalties *models.Penalties) (string, error) {
+	ctx := context.Background()
+
+	briefingFile, err := c.Drive.CopyFile(ctx, conf.BriefingTemplateDocID, conf.BriefingFolderID,
+		fmt.Sprintf("Drivers Briefing Round %d at %s", conf.NextRound.Number, conf.NextRound.Track))
 	if err != nil {
 		return "", fmt.Errorf("failed to copy Briefing Template to Briefing folder: %s", err)
 	}
 
-	ctx := context.Background()
-	service, err := docs.NewService(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed connecting to Google Docs: %s", err)
-	}
-
-	docRequest := service.Documents.Get(briefingFile.Id)
-	briefingDoc, err := docRequest.Do()
+	briefingDoc, err := c.Docs.GetDocument(ctx, briefingFile.Id)
 	if err != nil {
 		return "", fmt.Errorf("failed getting Briefing Doc: %s", err)
 	}
-	// json, err := briefingDoc.MarshalJSON()
-	// if err != nil {
-	// 	return "", fmt.Errorf("failed marshaling briefing doc to json: %s", err)
-	// }
-	// os.WriteFile("doc.json", json, 0600)
 
 	updates, err := generateUpdates(conf, penalties, briefingDoc)
 	if err != nil {
 		return "", fmt.Errorf("failed processing Briefing Template: %s", err)
 	}
-	docUpdateRequest := service.Documents.BatchUpdate(briefingFile.Id, updates)
 
-	_, err = docUpdateRequest.Do()
+	_, err = c.Docs.BatchUpdateDocument(ctx, briefingFile.Id, updates)
 	if err != nil {
 		return "", fmt.Errorf("could not update the Briefing Doc: %s", err)
 	}
@@ -49,25 +84,14 @@ func GenerateBriefing(conf *config.Config, penalties *models.Penalties) (string,
 	return fmt.Sprintf("https://docs.google.com/document/d/%s", briefingFile.Id), nil
 }
 
-func GeneratePenaltyTracker(conf *config.Config) (string, error) {
-	file, err := copyFile(conf.TrackerTemplateDocID, conf.TrackerFolderID, fmt.Sprintf("%s Rookies Round %d - %s", conf.Season, conf.NextRound.Number, conf.NextRound.Track))
+func (c *Client) GeneratePenaltyTracker(conf *config.Config) (string, error) {
+	ctx := context.Background()
+	file, err := c.Drive.CopyFile(ctx, conf.TrackerTemplateDocID, conf.TrackerFolderID,
+		fmt.Sprintf("%s Rookies Round %d - %s", conf.Season, conf.NextRound.Number, conf.NextRound.Track))
 	if err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s", file.Id), nil
-}
-
-func copyFile(template, folder, title string) (*drive.File, error) {
-	driveCtx := context.Background()
-	driveService, err := drive.NewService(driveCtx)
-	if err != nil {
-		return nil, err
-	}
-	copyReq := driveService.Files.Copy(template, &drive.File{
-		Name:    title,
-		Parents: []string{folder},
-	})
-	return copyReq.Do()
 }
 
 func generateUpdates(conf *config.Config, penalties *models.Penalties, doc *docs.Document) (*docs.BatchUpdateDocumentRequest, error) {
