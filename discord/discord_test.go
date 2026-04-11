@@ -528,6 +528,17 @@ var _ = Describe("CreateBriefingEvent", func() {
 		Expect(eventCreate.Name).To(ContainSubstring("5"))
 		Expect(eventCreate.Name).To(ContainSubstring("Monza"))
 	})
+
+	It("returns error when the configured channel is not a guild text channel", func() {
+		var dmChannel dgo.DMChannel
+		if err := json.Unmarshal([]byte(`{"id":"111","type":1}`), &dmChannel); err != nil {
+			Fail("failed to create DM channel: " + err.Error())
+		}
+		fakeRest.GetChannelReturns(dmChannel, nil)
+		err := dc.CreateBriefingEvent(&conf.RoundConfig)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("not a guild channel"))
+	})
 })
 
 var _ = Describe("SendMessage", func() {
