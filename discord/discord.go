@@ -49,11 +49,13 @@ func (e DiscordHandleNotFoundError) String() string {
 }
 
 type DiscordClient struct {
-	client     bot.Client
-	conf       *config.Config
-	guild      snowflake.ID
-	memberList map[string]snowflake.ID
-	gcloud     *gcloud.Client
+	botClient     bot.Client
+	rest          BotRestClient
+	applicationID snowflake.ID
+	conf          *config.Config
+	guild         snowflake.ID
+	memberList    map[string]snowflake.ID
+	gcloud        *gcloud.Client
 }
 
 func downloadAttachment(url string) ([]byte, error) {
@@ -361,24 +363,22 @@ func NewDiscordClient(conf *config.Config, gc *gcloud.Client) (*DiscordClient, e
 	}
 
 	dc := &DiscordClient{
-		conf:   conf,
-		client: client,
-		gcloud: gc,
+		conf:          conf,
+		botClient:     client,
+		rest:          client.Rest(),
+		applicationID: client.ApplicationID(),
+		gcloud:        gc,
 	}
 
 	client.AddEventListeners(bot.NewListenerFunc(dc.onMessageCreate))
-	if err != nil {
-		return nil, err
-	}
-
 	return dc, nil
 }
 
 func (d *DiscordClient) OpenGateway(ctx context.Context) error {
-	return d.client.OpenGateway(ctx)
+	return d.botClient.OpenGateway(ctx)
 }
 func (d *DiscordClient) Close(ctx context.Context) {
-	d.client.Close(ctx)
+	d.botClient.Close(ctx)
 }
 
 func (d *DiscordClient) BuildPenaltyMessage(penalties *models.Penalties, config *config.RoundConfig) (discord.MessageCreate, error) {
@@ -427,24 +427,24 @@ func (d *DiscordClient) BuildBriefingMessage(penalties *models.Penalties, briefi
 }
 
 func (d *DiscordClient) SendMessage(message discord.MessageCreate) (*discord.Message, error) {
-	return d.client.Rest().CreateMessage(d.conf.DiscordChannelId, message)
+	return d.rest.CreateMessage(d.conf.DiscordChannelId, message)
 }
 
 func (d *DiscordClient) Repin(message *discord.Message) error {
-	pinnedMessages, err := d.client.Rest().GetPinnedMessages(d.conf.DiscordChannelId)
+	pinnedMessages, err := d.rest.GetPinnedMessages(d.conf.DiscordChannelId)
 	if err != nil {
 		return err
 	}
 	for _, msg := range pinnedMessages {
-		if msg.Author.ID == d.client.ApplicationID() {
-			err := d.client.Rest().UnpinMessage(d.conf.DiscordChannelId, msg.ID)
+		if msg.Author.ID == d.applicationID {
+			err := d.rest.UnpinMessage(d.conf.DiscordChannelId, msg.ID)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	return d.client.Rest().PinMessage(d.conf.DiscordChannelId, message.ID)
+	return d.rest.PinMessage(d.conf.DiscordChannelId, message.ID)
 }
 
 func (d *DiscordClient) CreateBriefingEvent(config *config.RoundConfig) error {
@@ -463,7 +463,7 @@ func (d *DiscordClient) CreateBriefingEvent(config *config.RoundConfig) error {
 		PrivacyLevel:       discord.ScheduledEventPrivacyLevelGuildOnly,
 		EntityType:         discord.ScheduledEventEntityTypeStageInstance,
 	}
-	_, err = d.client.Rest().CreateGuildScheduledEvent(guildId, event)
+	_, err = d.rest.CreateGuildScheduledEvent(guildId, event)
 	return err
 }
 
@@ -489,7 +489,7 @@ func (d *DiscordClient) getGuild() (snowflake.ID, error) {
 		return d.guild, nil
 	}
 
-	channel, err := d.client.Rest().GetChannel(d.conf.DiscordChannelId)
+	channel, err := d.rest.GetChannel(d.conf.DiscordChannelId)
 	if err != nil {
 		return 0, err
 	}
@@ -507,7 +507,7 @@ func (d *DiscordClient) lookupRole(roleName string) (discord.Role, error) {
 		return discord.Role{}, err
 	}
 
-	roles, err := d.client.Rest().GetRoles(guildId)
+	roles, err := d.rest.GetRoles(guildId)
 	if err != nil {
 		return discord.Role{}, err
 	}
@@ -532,7 +532,7 @@ func (d *DiscordClient) getDriverId(handle string) (snowflake.ID, error) {
 
 		var lastUser snowflake.ID
 		for {
-			members, err := d.client.Rest().GetMembers(guildId, 1000, lastUser)
+			members, err := d.rest.GetMembers(guildId, 1000, lastUser)
 			if err != nil {
 				return 0, err
 			}
@@ -686,4 +686,14 @@ func (d *DiscordClient) generatePenaltyMessage(penalties *models.Penalties, conf
 `, config.PreviousRound.PenaltyTrackerLink)
 
 	return message, nil
+}
+
+// NewTestDiscordClient creates a DiscordClient with injected dependencies for testing.
+func NewTestDiscordClient(rest BotRestClient, applicationID snowflake.ID, conf *config.Config, gc *gcloud.Client) *DiscordClient {
+	return &DiscordClient{
+		rest:          rest,
+		applicationID: applicationID,
+		conf:          conf,
+		gcloud:        gc,
+	}
 }
