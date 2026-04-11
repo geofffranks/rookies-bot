@@ -283,6 +283,45 @@ var _ = Describe("CreateBriefingEvent", func() {
 	})
 })
 
+var _ = Describe("SendMessage", func() {
+	var (
+		fakeRest *fakes.FakeBotRestClient
+		conf     *config.Config
+		dc       *discord.DiscordClient
+	)
+
+	BeforeEach(func() {
+		fakeRest = new(fakes.FakeBotRestClient)
+		conf = &config.Config{
+			BotConfig: config.BotConfig{
+				DiscordChannelId: snowflake.ID(111),
+			},
+		}
+		dc = newTestClient(fakeRest, conf)
+	})
+
+	It("calls CreateMessage on the configured channel with the given message", func() {
+		fakeRest.CreateMessageReturns(&dgo.Message{ID: snowflake.ID(999)}, nil)
+		msg := dgo.NewMessageCreateBuilder().SetContent("test message").Build()
+
+		result, err := dc.SendMessage(msg)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.ID).To(Equal(snowflake.ID(999)))
+
+		Expect(fakeRest.CreateMessageCallCount()).To(Equal(1))
+		chanID, content, _ := fakeRest.CreateMessageArgsForCall(0)
+		Expect(chanID).To(Equal(snowflake.ID(111)))
+		Expect(content.Content).To(Equal("test message"))
+	})
+
+	It("propagates an error from CreateMessage", func() {
+		fakeRest.CreateMessageReturns(nil, &errorMsg{msg: "discord API unavailable"})
+
+		_, err := dc.SendMessage(dgo.MessageCreate{})
+		Expect(err).To(MatchError("discord API unavailable"))
+	})
+})
+
 type errorMsg struct {
 	msg string
 }
