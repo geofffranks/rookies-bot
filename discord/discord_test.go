@@ -2,6 +2,7 @@ package discord_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/disgoorg/disgo/rest"
@@ -449,6 +450,76 @@ var _ = Describe("BuildPenaltyMessage", func() {
 		}
 		_, err := dc9.BuildPenaltyMessage(penalties, &conf.RoundConfig)
 		Expect(err).To(MatchError("members API error"))
+	})
+
+	Context("GetMembers error propagates for each penalty category", func() {
+		BeforeEach(func() {
+			fakeRest.GetMembersReturns(nil, fmt.Errorf("members unavailable"))
+		})
+
+		It("propagates error for PitStartsR1", func() {
+			penalties := &models.Penalties{
+				PitStartsR1: []models.Driver{{FirstName: "Driver", LastName: "X", CarNumber: 1, DiscordHandle: "driverx"}},
+			}
+			_, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("propagates error for QualiBansR2", func() {
+			penalties := &models.Penalties{
+				QualiBansR2: []models.Driver{{FirstName: "Driver", LastName: "X", CarNumber: 1, DiscordHandle: "driverx"}},
+			}
+			_, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("propagates error for PitStartsR2", func() {
+			penalties := &models.Penalties{
+				PitStartsR2: []models.Driver{{FirstName: "Driver", LastName: "X", CarNumber: 1, DiscordHandle: "driverx"}},
+			}
+			_, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("propagates error for PitStartsR1CarriedOver", func() {
+			penalties := &models.Penalties{
+				PitStartsR1CarriedOver: []models.Driver{{FirstName: "Driver", LastName: "X", CarNumber: 1, DiscordHandle: "driverx"}},
+			}
+			_, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("propagates error for QualiBansR1CarriedOver", func() {
+			penalties := &models.Penalties{
+				QualiBansR1CarriedOver: []models.Driver{{FirstName: "Driver", LastName: "X", CarNumber: 1, DiscordHandle: "driverx"}},
+			}
+			_, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("propagates error for QualiBansR2CarriedOver", func() {
+			penalties := &models.Penalties{
+				QualiBansR2CarriedOver: []models.Driver{{FirstName: "Driver", LastName: "X", CarNumber: 1, DiscordHandle: "driverx"}},
+			}
+			_, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("propagates error for PitStartsR2CarriedOver", func() {
+			penalties := &models.Penalties{
+				PitStartsR2CarriedOver: []models.Driver{{FirstName: "Driver", LastName: "X", CarNumber: 1, DiscordHandle: "driverx"}},
+			}
+			_, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("propagates error for QualiBansR1", func() {
+			penalties := &models.Penalties{
+				QualiBansR1: []models.Driver{{FirstName: "Driver", LastName: "X", CarNumber: 1, DiscordHandle: "driverx"}},
+			}
+			_, err := dc.BuildPenaltyMessage(penalties, &conf.RoundConfig)
+			Expect(err).To(HaveOccurred())
+		})
 	})
 })
 
