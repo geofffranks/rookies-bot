@@ -291,12 +291,13 @@ func (d *DiscordClient) runRaceSetup(roundConfig *config.RoundConfig, sgClient *
 	}
 
 	var attachment string
+	var nextRoundConfig *config.RoundConfig
 	if roundConfig.NextRound.Track != "" {
 		bigConfig := &config.Config{
 			RoundConfig: *roundConfig,
 			BotConfig:   d.conf.BotConfig,
 		}
-		nextRoundConfig, err := generateNextRoundConfig(sgClient, gcClient, bigConfig, penalties)
+		nextRoundConfig, err = generateNextRoundConfig(sgClient, gcClient, bigConfig, penalties)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to generate config for next round: %w", err)
 		}
@@ -327,8 +328,16 @@ func (d *DiscordClient) runRaceSetup(roundConfig *config.RoundConfig, sgClient *
 	}
 
 	msgText := fmt.Sprintf("Race setup for %s complete!\n", roundConfig.NextRound)
-	if roundConfig.NextRound.Track != "" {
-		msgText = fmt.Sprintf("%s\n[Penalty Tracker](%s)\n", msgText, roundConfig.NextRound.PenaltyTrackerLink)
+	if nextRoundConfig != nil {
+		msgText = fmt.Sprintf("%s\n[Penalty Tracker](%s)\n", msgText, nextRoundConfig.PreviousRound.PenaltyTrackerLink)
+	}
+
+	if len(penalties.UniqueDriverNumbers()) > 0 {
+		msgText = fmt.Sprintf("%s\nDQ List:\n```", msgText)
+		for _, carNum := range penalties.UniqueDriverNumbers() {
+			msgText = fmt.Sprintf("%s\n/dq %d\n", msgText, carNum)
+		}
+		msgText = fmt.Sprintf("%s\n```", msgText)
 	}
 
 	return msgText, attachment, nil

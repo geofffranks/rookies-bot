@@ -659,6 +659,52 @@ var _ = Describe("runRaceSetup", func() {
 			_ = os.Remove(attachment)
 		}
 	})
+
+	It("includes /dq lines in success message when drivers have penalties", func() {
+		// Simgrid returns one driver with car #99
+		sgServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "entrylist") {
+				_, _ = w.Write([]byte(`{"entries":[{"drivers":[{"firstName":"Test","lastName":"Driver","playerId":"S999"}],"raceNumber":99}]}`))
+			} else {
+				_, _ = w.Write([]byte(`[{"steam64_id":"999","username":"testdriver"}]`))
+			}
+		})
+		roundConfig.Penalties.QualiBansR1 = []int{99}
+
+		msg, _, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg).To(ContainSubstring("DQ List:"))
+		Expect(msg).To(ContainSubstring("/dq 99"))
+	})
+
+	It("success message contains tracker URL from generated next round config, not stale roundConfig", func() {
+		roundConfig.NextRound.Track = "Silverstone"
+		roundConfig.NextRound.Number = 3
+		// Call 0 = briefing doc (default "test-doc-id" from BeforeEach)
+		// Call 1 = tracker sheet — use a distinct ID we can assert on
+		fakeDrive.CopyFileReturnsOnCall(1, &drive.File{Id: "tracker-sheet-id"}, nil)
+
+		sgServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "entrylist") {
+				_, _ = w.Write([]byte(`{"entries":[]}`))
+			} else if strings.Contains(r.URL.Path, "participating_users") {
+				_, _ = w.Write([]byte(`[]`))
+			} else {
+				_, _ = w.Write([]byte(`{"races":[{"track":{"name":"Round1"}},{"track":{"name":"Round2"}},{"track":{"name":"Silverstone"}}]}`))
+			}
+		})
+
+		msg, attachment, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg).To(ContainSubstring("docs.google.com/spreadsheets/d/tracker-sheet-id"))
+		if attachment != "" {
+			_ = os.Remove(attachment)
+		}
+	})
 })
 
 var _ = Describe("getRoundConfig", func() {
