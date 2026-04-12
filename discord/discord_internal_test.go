@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	dgo "github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/geofffranks/rookies-bot/config"
@@ -657,5 +658,107 @@ var _ = Describe("runRaceSetup", func() {
 		if attachment != "" {
 			_ = os.Remove(attachment)
 		}
+	})
+})
+
+var _ = Describe("getRoundConfig", func() {
+	It("returns error when message has 0 attachments", func() {
+		event := &events.MessageCreate{
+			GenericMessage: &events.GenericMessage{
+				Message: dgo.Message{Attachments: []dgo.Attachment{}},
+			},
+		}
+		_, err := getRoundConfig(event)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("no race penalty YAML file"))
+	})
+
+	It("returns error when message has 2 attachments", func() {
+		event := &events.MessageCreate{
+			GenericMessage: &events.GenericMessage{
+				Message: dgo.Message{
+					Attachments: []dgo.Attachment{
+						{URL: "http://example.com/a.yaml"},
+						{URL: "http://example.com/b.yaml"},
+					},
+				},
+			},
+		}
+		_, err := getRoundConfig(event)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("too many attachments"))
+	})
+
+	It("returns error when download fails (unreachable URL)", func() {
+		event := &events.MessageCreate{
+			GenericMessage: &events.GenericMessage{
+				Message: dgo.Message{
+					Attachments: []dgo.Attachment{
+						{URL: "http://127.0.0.1:1/unreachable.yaml"},
+					},
+				},
+			},
+		}
+		_, err := getRoundConfig(event)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("unexpected error downloading"))
+	})
+
+	It("returns error when server returns non-YAML", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`}{not valid yaml or json`))
+		}))
+		defer server.Close()
+		event := &events.MessageCreate{
+			GenericMessage: &events.GenericMessage{
+				Message: dgo.Message{
+					Attachments: []dgo.Attachment{{URL: server.URL + "/config.yaml"}},
+				},
+			},
+		}
+		_, err := getRoundConfig(event)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("unable to parse race penalty YAML file"))
+	})
+
+	It("returns *config.RoundConfig with correct fields from valid YAML", func() {
+		yaml := `
+previous_round:
+  number: 1
+  track: "Monza"
+  penalty_tracker_link: "http://tracker.example.com"
+next_round:
+  number: 2
+  track: "Silverstone"
+  penalty_tracker_link: "http://tracker2.example.com"
+penalties:
+  quali_bans_r1: []
+  quali_bans_r2: []
+  pit_starts_r1: []
+  pit_starts_r2: []
+penalties_carried_over:
+  quali_bans_r1: []
+  quali_bans_r2: []
+  pit_starts_r1: []
+  pit_starts_r2: []
+`
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(yaml))
+		}))
+		defer server.Close()
+		event := &events.MessageCreate{
+			GenericMessage: &events.GenericMessage{
+				Message: dgo.Message{
+					Attachments: []dgo.Attachment{{URL: server.URL + "/config.yaml"}},
+				},
+			},
+		}
+		rc, err := getRoundConfig(event)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(rc.PreviousRound.Number).To(Equal(1))
+		Expect(rc.PreviousRound.Track).To(Equal("Monza"))
+		Expect(rc.NextRound.Number).To(Equal(2))
 	})
 })
