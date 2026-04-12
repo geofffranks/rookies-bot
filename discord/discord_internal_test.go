@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
+	dgo "github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/geofffranks/rookies-bot/config"
 	"github.com/geofffranks/rookies-bot/models"
+	"github.com/geofffranks/rookies-bot/simgrid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -265,5 +269,170 @@ var _ = Describe("downloadAttachment", func() {
 		content, err := downloadAttachment(server.URL)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(content).To(BeEmpty())
+	})
+})
+
+// stubRest implements BotRestClient using function fields so each test can
+// inject only the methods it cares about. All stubs default to no-op / nil.
+type stubRest struct {
+	createMessageFn             func(channelID snowflake.ID, messageCreate dgo.MessageCreate, opts ...rest.RequestOpt) (*dgo.Message, error)
+	getPinnedMessagesFn         func(channelID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Message, error)
+	unpinMessageFn              func(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error
+	pinMessageFn                func(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error
+	getChannelFn                func(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error)
+	getRolesFn                  func(guildID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Role, error)
+	getMembersFn                func(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error)
+	createGuildScheduledEventFn func(guildID snowflake.ID, e dgo.GuildScheduledEventCreate, opts ...rest.RequestOpt) (*dgo.GuildScheduledEvent, error)
+}
+
+func (s *stubRest) CreateMessage(channelID snowflake.ID, messageCreate dgo.MessageCreate, opts ...rest.RequestOpt) (*dgo.Message, error) {
+	if s.createMessageFn != nil {
+		return s.createMessageFn(channelID, messageCreate, opts...)
+	}
+	id := snowflake.ID(42)
+	return &dgo.Message{ID: id}, nil
+}
+func (s *stubRest) GetPinnedMessages(channelID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Message, error) {
+	if s.getPinnedMessagesFn != nil {
+		return s.getPinnedMessagesFn(channelID, opts...)
+	}
+	return nil, nil
+}
+func (s *stubRest) UnpinMessage(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error {
+	if s.unpinMessageFn != nil {
+		return s.unpinMessageFn(channelID, messageID, opts...)
+	}
+	return nil
+}
+func (s *stubRest) PinMessage(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error {
+	if s.pinMessageFn != nil {
+		return s.pinMessageFn(channelID, messageID, opts...)
+	}
+	return nil
+}
+func (s *stubRest) GetChannel(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error) {
+	if s.getChannelFn != nil {
+		return s.getChannelFn(channelID, opts...)
+	}
+	return dgo.GuildTextChannel{}, nil
+}
+func (s *stubRest) GetRoles(guildID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Role, error) {
+	if s.getRolesFn != nil {
+		return s.getRolesFn(guildID, opts...)
+	}
+	return nil, nil
+}
+func (s *stubRest) GetMembers(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error) {
+	if s.getMembersFn != nil {
+		return s.getMembersFn(guildID, limit, after, opts...)
+	}
+	return nil, nil
+}
+func (s *stubRest) CreateGuildScheduledEvent(guildID snowflake.ID, e dgo.GuildScheduledEventCreate, opts ...rest.RequestOpt) (*dgo.GuildScheduledEvent, error) {
+	if s.createGuildScheduledEventFn != nil {
+		return s.createGuildScheduledEventFn(guildID, e, opts...)
+	}
+	return &dgo.GuildScheduledEvent{}, nil
+}
+
+var _ = Describe("runAnnouncePenalties", func() {
+	var (
+		client      *DiscordClient
+		stub        *stubRest
+		roundConfig *config.RoundConfig
+		sgServer    *httptest.Server
+		sgClient    *simgrid.SimGridClient
+	)
+
+	BeforeEach(func() {
+		stub = &stubRest{}
+		client = NewTestDiscordClient(stub, snowflakeID(1), &config.Config{
+			BotConfig: config.BotConfig{
+				DiscordChannelId: snowflakeID(111),
+				DiscordRoleName:  "test-role",
+			},
+		}, nil)
+		roundConfig = &config.RoundConfig{
+			PreviousRound: config.Round{Number: 1},
+			NextRound:     config.Round{Number: 2},
+			Penalties:     config.Penalty{},
+		}
+		// default simgrid server: returns empty driver list
+		sgServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "entrylist") {
+				_, _ = w.Write([]byte(`{"entries":[]}`))
+			} else {
+				_, _ = w.Write([]byte(`[]`))
+			}
+		}))
+		sgClient = simgrid.NewClient("test-token")
+		sgClient.BaseURL = sgServer.URL
+	})
+
+	AfterEach(func() {
+		sgServer.Close()
+	})
+
+	It("returns error when BuildDriverLookup fails", func() {
+		sgServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		})
+		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("Failed building driver list"))
+	})
+
+	It("returns error when buildPenaltyList fails (unknown car)", func() {
+		roundConfig.Penalties.QualiBansR1 = []int{999}
+		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("Failed generating penalty summary"))
+	})
+
+	It("returns error when BuildPenaltyMessage fails (GetMembers error)", func() {
+		roundConfig.Penalties.QualiBansR1 = []int{1}
+		// Mock the server to return a driver with car number 1
+		sgServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "entrylist") {
+				_, _ = w.Write([]byte(`{"entries":[{"drivers":[{"firstName":"Test","lastName":"Driver","playerId":"S123"}],"raceNumber":1}]}`))
+			} else {
+				_, _ = w.Write([]byte(`[{"steam64_id":"123","username":"testdriver"}]`))
+			}
+		})
+		stub.getMembersFn = func(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error) {
+			return nil, fmt.Errorf("members fetch failed")
+		}
+		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("Failed to generate penalty message"))
+	})
+
+	It("returns error when SendMessage fails", func() {
+		stub.createMessageFn = func(channelID snowflake.ID, messageCreate dgo.MessageCreate, opts ...rest.RequestOpt) (*dgo.Message, error) {
+			return nil, fmt.Errorf("send failed")
+		}
+		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("Failed to send penalty announcement"))
+	})
+
+	It("returns error when Repin fails", func() {
+		stub.pinMessageFn = func(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error {
+			return fmt.Errorf("pin failed")
+		}
+		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("Failed to pin penalty announcement"))
+	})
+
+	It("returns msg containing previous round name on happy path", func() {
+		msg, attachment, err := client.runAnnouncePenalties(roundConfig, sgClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg).To(ContainSubstring("Round 1"))
+		Expect(attachment).To(BeEmpty())
 	})
 })

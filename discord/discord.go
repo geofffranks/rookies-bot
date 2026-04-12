@@ -212,49 +212,48 @@ func sendBotResponse(event *events.MessageCreate, msg, attachment string) {
 		fmt.Printf("No response message content provided\n")
 	}
 }
+func (d *DiscordClient) runAnnouncePenalties(roundConfig *config.RoundConfig, sgClient *simgrid.SimGridClient) (string, string, error) {
+	driverLookup, err := sgClient.BuildDriverLookup(d.conf.ChampionshipId)
+	if err != nil {
+		return "", "", fmt.Errorf("Failed building driver list: %w", err)
+	}
+
+	penaltyList, err := buildPenaltyList(driverLookup, roundConfig)
+	if err != nil {
+		return "", "", fmt.Errorf("Failed generating penalty summary: %w", err)
+	}
+
+	msg, err := d.BuildPenaltyMessage(penaltyList, roundConfig)
+	if err != nil {
+		return "", "", fmt.Errorf("Failed to generate penalty message: %w", err)
+	}
+
+	sentMsg, err := d.SendMessage(msg)
+	if err != nil {
+		return "", "", fmt.Errorf("Failed to send penalty announcement: %w", err)
+	}
+
+	err = d.Repin(sentMsg)
+	if err != nil {
+		return "", "", fmt.Errorf("Failed to pin penalty announcement: %w", err)
+	}
+
+	return fmt.Sprintf("Ok, I have announced penalties from %s", roundConfig.PreviousRound), "", nil
+}
+
 func (d *DiscordClient) announcePenalties(event *events.MessageCreate) {
 	var msg, attachment string
-	// reply back to the sender before returning
-	defer func() {
-		sendBotResponse(event, msg, attachment)
-	}()
+	defer func() { sendBotResponse(event, msg, attachment) }()
 	roundConfig, err := getRoundConfig(event)
 	if err != nil {
 		msg = fmt.Sprintf("Failed getting race config: %s", err)
 		return
 	}
-
 	sgClient := simgrid.NewClient(d.conf.SimGridApiToken)
-
-	driverLookup, err := sgClient.BuildDriverLookup(d.conf.ChampionshipId)
+	msg, attachment, err = d.runAnnouncePenalties(roundConfig, sgClient)
 	if err != nil {
-		msg = fmt.Sprintf("Failed building driver list: %s\n", err)
-		return
+		msg = err.Error()
 	}
-
-	penalties, err := buildPenaltyList(driverLookup, roundConfig)
-	if err != nil {
-		msg = fmt.Sprintf("Failed generating penalty summary: %s", err)
-		return
-	}
-
-	penaltyMessage, err := d.BuildPenaltyMessage(penalties, roundConfig)
-	if err != nil {
-		msg = fmt.Sprintf("Failed to generate penalty message: %s", err)
-		return
-	}
-	announcementMsg, err := d.SendMessage(penaltyMessage)
-	if err != nil {
-		msg = fmt.Sprintf("Failed to send penalty announcement: %s", err)
-		return
-	}
-	err = d.Repin(announcementMsg)
-	if err != nil {
-		msg = fmt.Sprintf("Failed to pin penalty announcement: %s", err)
-		return
-	}
-
-	msg = fmt.Sprintf("Ok, I have announced penalties from %s", roundConfig.PreviousRound)
 }
 
 func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
