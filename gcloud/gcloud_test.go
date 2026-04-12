@@ -3,6 +3,7 @@ package gcloud_test
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/geofffranks/rookies-bot/config"
 	"github.com/geofffranks/rookies-bot/gcloud"
@@ -34,6 +35,17 @@ func makeDoc(streamIndex int64) *docs.Document {
 			},
 		},
 	}
+}
+
+// insertedTexts extracts all InsertText content values from a BatchUpdateDocumentRequest.
+func insertedTexts(req *docs.BatchUpdateDocumentRequest) []string {
+	var texts []string
+	for _, r := range req.Requests {
+		if r.InsertText != nil {
+			texts = append(texts, r.InsertText.Text)
+		}
+	}
+	return texts
 }
 
 var _ = Describe("Client", func() {
@@ -208,5 +220,119 @@ var _ = Describe("generateUpdates (via GenerateBriefing)", func() {
 		}
 		Expect(texts).To(ContainElement("[group1]->EVEN"))
 		Expect(texts).To(ContainElement("[group2]->ODD"))
+	})
+})
+
+var _ = Describe("generateUpdates carried-over penalties", func() {
+	var (
+		fakeDocsService  *fakes.FakeDocsServicer
+		fakeDriveService *fakes.FakeDriveServicer
+		client           *gcloud.Client
+		conf             *config.Config
+	)
+
+	BeforeEach(func() {
+		fakeDocsService = new(fakes.FakeDocsServicer)
+		fakeDriveService = new(fakes.FakeDriveServicer)
+		client = &gcloud.Client{Docs: fakeDocsService, Drive: fakeDriveService}
+		fakeDriveService.CopyFileReturns(&drive.File{Id: "doc-id"}, nil)
+		fakeDocsService.GetDocumentReturns(makeDoc(5), nil)
+		fakeDocsService.BatchUpdateDocumentReturns(&docs.BatchUpdateDocumentResponse{}, nil)
+		conf = &config.Config{
+			BotConfig: config.BotConfig{Season: "2026"},
+			RoundConfig: config.RoundConfig{
+				NextRound: config.Round{Number: 4, Track: "Silverstone"},
+			},
+		}
+	})
+
+	getCapturedTexts := func() []string {
+		Expect(fakeDocsService.BatchUpdateDocumentCallCount()).To(BeNumerically(">", 0))
+		_, _, req := fakeDocsService.BatchUpdateDocumentArgsForCall(0)
+		return insertedTexts(req)
+	}
+
+	It("includes '(carried over)' for QualiBansR1CarriedOver driver", func() {
+		_, err := client.GenerateBriefing(conf, &models.Penalties{
+			QualiBansR1CarriedOver: []models.Driver{{FirstName: "Alice", LastName: "Anderson", CarNumber: 1}},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		texts := getCapturedTexts()
+		Expect(strings.Join(texts, " ")).To(ContainSubstring("Alice"))
+		Expect(strings.Join(texts, " ")).To(ContainSubstring("carried over"))
+	})
+
+	It("includes '(carried over)' for QualiBansR2CarriedOver driver", func() {
+		_, err := client.GenerateBriefing(conf, &models.Penalties{
+			QualiBansR2CarriedOver: []models.Driver{{FirstName: "Bob", LastName: "Brown", CarNumber: 2}},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		texts := getCapturedTexts()
+		Expect(strings.Join(texts, " ")).To(ContainSubstring("Bob"))
+		Expect(strings.Join(texts, " ")).To(ContainSubstring("carried over"))
+	})
+
+	It("includes '(carried over)' for PitStartsR1CarriedOver driver", func() {
+		_, err := client.GenerateBriefing(conf, &models.Penalties{
+			PitStartsR1CarriedOver: []models.Driver{{FirstName: "Carol", LastName: "Chen", CarNumber: 3}},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		texts := getCapturedTexts()
+		Expect(strings.Join(texts, " ")).To(ContainSubstring("Carol"))
+		Expect(strings.Join(texts, " ")).To(ContainSubstring("carried over"))
+	})
+
+	It("includes '(carried over)' for PitStartsR2CarriedOver driver", func() {
+		_, err := client.GenerateBriefing(conf, &models.Penalties{
+			PitStartsR2CarriedOver: []models.Driver{{FirstName: "Dave", LastName: "Davis", CarNumber: 4}},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		texts := getCapturedTexts()
+		Expect(strings.Join(texts, " ")).To(ContainSubstring("Dave"))
+		Expect(strings.Join(texts, " ")).To(ContainSubstring("carried over"))
+	})
+
+	It("includes driver without '(carried over)' for QualiBansR1", func() {
+		_, err := client.GenerateBriefing(conf, &models.Penalties{
+			QualiBansR1: []models.Driver{{FirstName: "Eve", LastName: "Edwards", CarNumber: 5}},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		texts := getCapturedTexts()
+		joined := strings.Join(texts, " ")
+		Expect(joined).To(ContainSubstring("Eve"))
+		Expect(joined).NotTo(ContainSubstring("carried over"))
+	})
+
+	It("includes driver without '(carried over)' for QualiBansR2", func() {
+		_, err := client.GenerateBriefing(conf, &models.Penalties{
+			QualiBansR2: []models.Driver{{FirstName: "Frank", LastName: "Flynn", CarNumber: 6}},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		texts := getCapturedTexts()
+		joined := strings.Join(texts, " ")
+		Expect(joined).To(ContainSubstring("Frank"))
+		Expect(joined).NotTo(ContainSubstring("carried over"))
+	})
+
+	It("includes driver without '(carried over)' for PitStartsR1", func() {
+		_, err := client.GenerateBriefing(conf, &models.Penalties{
+			PitStartsR1: []models.Driver{{FirstName: "Grace", LastName: "Green", CarNumber: 7}},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		texts := getCapturedTexts()
+		joined := strings.Join(texts, " ")
+		Expect(joined).To(ContainSubstring("Grace"))
+		Expect(joined).NotTo(ContainSubstring("carried over"))
+	})
+
+	It("includes driver without '(carried over)' for PitStartsR2", func() {
+		_, err := client.GenerateBriefing(conf, &models.Penalties{
+			PitStartsR2: []models.Driver{{FirstName: "Hank", LastName: "Harris", CarNumber: 8}},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		texts := getCapturedTexts()
+		joined := strings.Join(texts, " ")
+		Expect(joined).To(ContainSubstring("Hank"))
+		Expect(joined).NotTo(ContainSubstring("carried over"))
 	})
 })
