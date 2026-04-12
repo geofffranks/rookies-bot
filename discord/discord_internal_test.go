@@ -762,3 +762,69 @@ penalties_carried_over:
 		Expect(rc.NextRound.Number).To(Equal(2))
 	})
 })
+
+var _ = Describe("generateNextRoundConfig", func() {
+	var (
+		sgServer  *httptest.Server
+		sgClient  *simgrid.SimGridClient
+		gcClient  *gcloud.Client
+		fakeDrive *fakes.FakeDriveServicer
+		conf      *config.Config
+		penalties *models.Penalties
+	)
+
+	BeforeEach(func() {
+		fakeDrive = &fakes.FakeDriveServicer{}
+		gcClient = &gcloud.Client{
+			Drive: fakeDrive,
+		}
+		conf = &config.Config{
+			BotConfig: config.BotConfig{
+				ChampionshipId:    "champ-123",
+				Season:            "S1",
+				TrackerTemplateDocID: "template-123",
+				TrackerFolderID:   "folder-456",
+			},
+			RoundConfig: config.RoundConfig{
+				NextRound: config.Round{Number: 3, Track: "Spa"},
+			},
+		}
+		penalties = &models.Penalties{}
+
+		sgServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"races":[{"track":{"name":"R1"}},{"track":{"name":"R2"}},{"track":{"name":"Spa"}}]}`))
+		}))
+		sgClient = simgrid.NewClient("test-token")
+		sgClient.BaseURL = sgServer.URL
+
+		fakeDrive.CopyFileReturns(&drive.File{Id: "tracker-file-id"}, nil)
+	})
+
+	AfterEach(func() {
+		sgServer.Close()
+	})
+
+	It("returns error when simgrid returns 4xx", func() {
+		sgServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		})
+		_, err := generateNextRoundConfig(sgClient, gcClient, conf, penalties)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed getting details for next round"))
+	})
+
+	It("returns error when GeneratePenaltyTracker fails", func() {
+		fakeDrive.CopyFileReturns(nil, fmt.Errorf("drive copy failed"))
+		_, err := generateNextRoundConfig(sgClient, gcClient, conf, penalties)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed generating penalty tracker"))
+	})
+
+	It("returns *config.RoundConfig with PenaltyTrackerLink set on happy path", func() {
+		result, err := generateNextRoundConfig(sgClient, gcClient, conf, penalties)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.PreviousRound.PenaltyTrackerLink).To(ContainSubstring("docs.google.com"))
+	})
+})
