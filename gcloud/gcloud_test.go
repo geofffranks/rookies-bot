@@ -335,4 +335,33 @@ var _ = Describe("generateUpdates carried-over penalties", func() {
 		Expect(joined).To(ContainSubstring("Hank"))
 		Expect(joined).NotTo(ContainSubstring("carried over"))
 	})
+
+	// BUG DOCUMENTATION: penaltyStartIndex is int64, starts at 0, and the guard
+	// is `if penaltyStartIndex < 0`. Since 0 is never < 0, a doc with no Stream
+	// heading silently uses index 0 instead of returning an error. This test
+	// documents the current (buggy) behavior so any future fix is caught.
+	It("silently uses index 0 when doc has no Stream heading (documents bug)", func() {
+		noStreamDoc := &docs.Document{
+			Body: &docs.Body{
+				Content: []*docs.StructuralElement{
+					{
+						Paragraph: &docs.Paragraph{
+							Elements: []*docs.ParagraphElement{
+								{TextRun: &docs.TextRun{Content: "Some other heading\n"}},
+							},
+							ParagraphStyle: &docs.ParagraphStyle{NamedStyleType: "HEADING_3"},
+						},
+						StartIndex: 1,
+						EndIndex:   20,
+					},
+				},
+			},
+		}
+		fakeDocsService.GetDocumentReturns(noStreamDoc, nil)
+		fakeDocsService.BatchUpdateDocumentReturns(&docs.BatchUpdateDocumentResponse{}, nil)
+
+		// BUG: should return error "no Stream heading found", but currently succeeds
+		_, err := client.GenerateBriefing(conf, &models.Penalties{})
+		Expect(err).NotTo(HaveOccurred()) // documents current buggy behavior
+	})
 })
