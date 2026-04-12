@@ -72,7 +72,7 @@ func downloadAttachment(url string) ([]byte, error) {
 func generateNextRoundConfig(sgc *simgrid.SimGridClient, gc *gcloud.Client, conf *config.Config, penalties *models.Penalties) (*config.RoundConfig, error) {
 	nextRound, err := sgc.GetNextRound(conf.ChampionshipId, conf.NextRound)
 	if err != nil {
-		return nil, fmt.Errorf("failed getting details for next round: %s", err)
+		return nil, fmt.Errorf("failed getting details for next round: %w", err)
 	}
 
 	nextRoundTracker, err := gc.GeneratePenaltyTracker(conf)
@@ -87,6 +87,21 @@ func generateNextRoundConfig(sgc *simgrid.SimGridClient, gc *gcloud.Client, conf
 		NextRound:            *nextRound,
 		CarriedOverPenalties: penalties.Consolidate(),
 	}, nil
+}
+
+func writeNextRoundConfig(conf *config.RoundConfig, season string) (string, error) {
+	data, err := yaml.Marshal(conf)
+	if err != nil {
+		return "", err
+	}
+
+	nextConfigFileName := strings.ToLower(fmt.Sprintf("%s-round-%d-%s.yml", season, conf.NextRound.Number, strings.ReplaceAll(conf.NextRound.Track, " ", "-")))
+	err = os.WriteFile(nextConfigFileName, data, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	return nextConfigFileName, nil
 }
 
 func getRoundConfig(event *events.MessageCreate) (*config.RoundConfig, error) {
@@ -256,101 +271,87 @@ func (d *DiscordClient) announcePenalties(event *events.MessageCreate) {
 	}
 }
 
-func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
-	var msg, attachment string
-	// reply back to the sender before returning
-	defer func() {
-		sendBotResponse(event, msg, attachment)
-	}()
-
-	roundConfig, err := getRoundConfig(event)
-	if err != nil {
-		msg = fmt.Sprintf("Failed getting race config: %s", err)
-		return
-	}
-
-	sgClient := simgrid.NewClient(d.conf.SimGridApiToken)
-
+func (d *DiscordClient) runRaceSetup(roundConfig *config.RoundConfig, sgClient *simgrid.SimGridClient, gcClient *gcloud.Client) (string, string, error) {
 	driverLookup, err := sgClient.BuildDriverLookup(d.conf.ChampionshipId)
 	if err != nil {
-		msg = fmt.Sprintf("Failed building driver list: %s\n", err)
-		return
+		return "", "", err
 	}
 
 	penalties, err := buildPenaltyList(driverLookup, roundConfig)
 	if err != nil {
-		msg = fmt.Sprintf("Failed generating penalty summary: %s", err)
-		return
+		return "", "", err
 	}
-	bigConfig := &config.Config{
+
+	briefingUrl, err := gcClient.GenerateBriefing(&config.Config{
 		RoundConfig: *roundConfig,
 		BotConfig:   d.conf.BotConfig,
-	}
-	briefingDoc, err := d.gcloud.GenerateBriefing(bigConfig, penalties)
+	}, penalties)
 	if err != nil {
-		msg = fmt.Sprintf("failed to generate briefing doc: %s", err)
-		return
+		return "", "", fmt.Errorf("failed to generate briefing doc: %w", err)
 	}
 
-	var nextConfigFileName string
-	var nextRoundConfig *config.RoundConfig
+	var attachment string
 	if roundConfig.NextRound.Track != "" {
-		nextRoundConfig, err = generateNextRoundConfig(sgClient, d.gcloud, bigConfig, penalties)
-		if err != nil {
-			msg = fmt.Sprintf("failed to generate config for next round: %s", err)
-			return
+		bigConfig := &config.Config{
+			RoundConfig: *roundConfig,
+			BotConfig:   d.conf.BotConfig,
 		}
-		data, err := yaml.Marshal(nextRoundConfig)
+		nextRoundConfig, err := generateNextRoundConfig(sgClient, gcClient, bigConfig, penalties)
 		if err != nil {
-			msg = fmt.Sprintf("failed to convert next round config to yaml: %s", err)
-			return
+			return "", "", fmt.Errorf("failed to generate config for next round: %w", err)
 		}
-
-		nextConfigFileName = strings.ToLower(fmt.Sprintf("%s-round-%d-%s.yml", d.conf.Season, roundConfig.NextRound.Number, strings.ReplaceAll(roundConfig.NextRound.Track, " ", "-")))
-		err = os.WriteFile(nextConfigFileName, data, 0644)
+		attachment, err = writeNextRoundConfig(nextRoundConfig, d.conf.Season)
 		if err != nil {
-			msg = fmt.Sprintf("failed to write out next round config to %s: %s", nextConfigFileName, err)
-			return
+			return "", "", err
 		}
-
 	}
 
-	briefingMessage, err := d.BuildBriefingMessage(penalties, briefingDoc, roundConfig)
+	msg, err := d.BuildBriefingMessage(penalties, briefingUrl, roundConfig)
 	if err != nil {
-		msg = fmt.Sprintf("failed to generate briefingmessage: %s", err)
-		return
+		return "", "", fmt.Errorf("failed to generate briefingmessage: %w", err)
 	}
-	announcementMsg, err := d.SendMessage(briefingMessage)
+
+	sentMsg, err := d.SendMessage(msg)
 	if err != nil {
-		msg = fmt.Sprintf("failed to send briefing announcement: %s", err)
-		return
+		return "", "", fmt.Errorf("failed to send briefing announcement: %w", err)
 	}
-	err = d.Repin(announcementMsg)
+
+	err = d.Repin(sentMsg)
 	if err != nil {
-		msg = fmt.Sprintf("failed to pin briefing announcement: %s", err)
-		return
+		return "", "", fmt.Errorf("failed to pin briefing announcement: %w", err)
 	}
 
 	err = d.CreateBriefingEvent(roundConfig)
 	if err != nil {
-		msg = fmt.Sprintf("failed to create briefing event: %s", err)
+		return "", "", fmt.Errorf("failed to create briefing event: %w", err)
+	}
+
+	msgText := fmt.Sprintf("Race setup for %s complete!\n", roundConfig.NextRound)
+	if roundConfig.NextRound.Track != "" {
+		msgText = fmt.Sprintf("%s\n[Penalty Tracker](%s)\n", msgText, roundConfig.NextRound.PenaltyTrackerLink)
+	}
+
+	return msgText, attachment, nil
+}
+
+func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
+	var msg, attachment string
+	defer func() { sendBotResponse(event, msg, attachment) }()
+	roundConfig, err := getRoundConfig(event)
+	if err != nil {
+		msg = err.Error()
 		return
 	}
-
-	msg = fmt.Sprintf("Race setup for %s complete!\n", roundConfig.NextRound)
-	if nextRoundConfig != nil {
-		msg = fmt.Sprintf("%s\n[Penalty Tracker](%s)\n", msg, nextRoundConfig.PreviousRound.PenaltyTrackerLink)
+	sgClient := simgrid.NewClient(d.conf.SimGridApiToken)
+	gcClient, err := gcloud.NewClient(context.Background())
+	if err != nil {
+		msg = err.Error()
+		return
 	}
-
-	if len(penalties.UniqueDriverNumbers()) > 0 {
-		msg = fmt.Sprintf("%s\nDQ List:\n```", msg)
-		for _, carNum := range penalties.UniqueDriverNumbers() {
-			msg = fmt.Sprintf("%s\n/dq %d\n", msg, carNum)
-		}
-		msg = fmt.Sprintf("%s\n```", msg)
+	msg, attachment, err = d.runRaceSetup(roundConfig, sgClient, gcClient)
+	if err != nil {
+		msg = err.Error()
 	}
-	fmt.Printf("%s", msg)
-	attachment = nextConfigFileName
 }
 
 func NewDiscordClient(conf *config.Config, gc *gcloud.Client) (*DiscordClient, error) {

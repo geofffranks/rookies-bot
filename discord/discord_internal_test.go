@@ -5,14 +5,19 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 
 	dgo "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/geofffranks/rookies-bot/config"
+	"github.com/geofffranks/rookies-bot/gcloud"
+	"github.com/geofffranks/rookies-bot/gcloud/fakes"
 	"github.com/geofffranks/rookies-bot/models"
 	"github.com/geofffranks/rookies-bot/simgrid"
+	"google.golang.org/api/docs/v1"
+	drive "google.golang.org/api/drive/v3"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -434,5 +439,223 @@ var _ = Describe("runAnnouncePenalties", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(msg).To(ContainSubstring("Round 1"))
 		Expect(attachment).To(BeEmpty())
+	})
+})
+
+// makeStreamDoc creates a minimal *docs.Document with a Stream H3 heading at body index 1.
+// This is needed by generateUpdates inside GenerateBriefing.
+func makeStreamDoc() *docs.Document {
+	return &docs.Document{
+		DocumentId: "test-doc",
+		Body: &docs.Body{
+			Content: []*docs.StructuralElement{
+				{
+					StartIndex: 0,
+					Paragraph: &docs.Paragraph{
+						Elements: []*docs.ParagraphElement{
+							{
+								TextRun: &docs.TextRun{
+									Content: "Title\n",
+								},
+							},
+						},
+					},
+				},
+				{
+					StartIndex: 1,
+					Paragraph: &docs.Paragraph{
+						ParagraphStyle: &docs.ParagraphStyle{
+							NamedStyleType: "HEADING_3",
+						},
+						Elements: []*docs.ParagraphElement{
+							{
+								TextRun: &docs.TextRun{
+									Content: "Stream",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+var _ = Describe("runRaceSetup", func() {
+	var (
+		client      *DiscordClient
+		stub        *stubRest
+		roundConfig *config.RoundConfig
+		sgServer    *httptest.Server
+		sgClient    *simgrid.SimGridClient
+		gcClient    *gcloud.Client
+		fakeDrive   *fakes.FakeDriveServicer
+		fakeDocs    *fakes.FakeDocsServicer
+	)
+
+	BeforeEach(func() {
+		stub = &stubRest{}
+		gcClient = &gcloud.Client{}
+		fakeDrive = &fakes.FakeDriveServicer{}
+		fakeDocs = &fakes.FakeDocsServicer{}
+		gcClient.Drive = fakeDrive
+		gcClient.Docs = fakeDocs
+
+		// Default fake drive returns a file with an ID
+		fakeDrive.CopyFileReturns(&drive.File{Id: "test-doc-id"}, nil)
+		// Default fake docs returns a document with Stream heading
+		fakeDocs.GetDocumentReturns(makeStreamDoc(), nil)
+
+		client = NewTestDiscordClient(stub, snowflakeID(1), &config.Config{
+			BotConfig: config.BotConfig{
+				DiscordChannelId:          snowflakeID(111),
+				DiscordBriefingChannelId:  snowflakeID(222),
+				DiscordRoleName:           "test-role",
+				Season:                    "S1",
+			},
+		}, gcClient)
+
+		roundConfig = &config.RoundConfig{
+			PreviousRound: config.Round{Number: 1, Track: "Monza"},
+			NextRound:     config.Round{Number: 2, Track: ""},
+			Penalties:     config.Penalty{},
+		}
+
+		// default simgrid server: returns empty driver list
+		sgServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "entrylist") {
+				_, _ = w.Write([]byte(`{"entries":[]}`))
+			} else {
+				_, _ = w.Write([]byte(`[]`))
+			}
+		}))
+		sgClient = simgrid.NewClient("test-token")
+		sgClient.BaseURL = sgServer.URL
+
+		// Default Discord stubs - getRoles must be set to return test-role
+		stub.getRolesFn = func(guildID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Role, error) {
+			return []dgo.Role{
+				{Name: "test-role", ID: snowflakeID(777)},
+			}, nil
+		}
+	})
+
+	AfterEach(func() {
+		sgServer.Close()
+	})
+
+	It("returns error when BuildDriverLookup fails (simgrid 500)", func() {
+		sgServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		})
+		_, _, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns error when GenerateBriefing fails (fakeDocs.Get returns error)", func() {
+		fakeDocs.GetDocumentReturns(nil, fmt.Errorf("docs error"))
+		_, _, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to generate briefing doc"))
+	})
+
+	It("returns error when generateNextRoundConfig fails (Track != '')", func() {
+		roundConfig.NextRound.Track = "Monza"
+		roundConfig.NextRound.Number = 1
+		sgServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if strings.Contains(r.URL.Path, "entrylist") {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"entries":[]}`))
+			} else if strings.Contains(r.URL.Path, "participating_users") {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`[]`))
+			} else {
+				// Championships endpoint fails
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		})
+		_, _, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to generate config for next round"))
+	})
+
+	It("returns error when BuildBriefingMessage fails (getRoles returns error)", func() {
+		stub.getRolesFn = func(guildID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Role, error) {
+			return nil, fmt.Errorf("roles error")
+		}
+		fakeDocs.GetDocumentReturns(makeStreamDoc(), nil)
+		_, _, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to generate briefingmessage"))
+	})
+
+	It("returns error when SendMessage fails", func() {
+		stub.createMessageFn = func(channelID snowflake.ID, messageCreate dgo.MessageCreate, opts ...rest.RequestOpt) (*dgo.Message, error) {
+			return nil, fmt.Errorf("send failed")
+		}
+		fakeDocs.GetDocumentReturns(makeStreamDoc(), nil)
+		_, _, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to send briefing announcement"))
+	})
+
+	It("returns error when Repin fails", func() {
+		stub.pinMessageFn = func(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error {
+			return fmt.Errorf("pin failed")
+		}
+		fakeDocs.GetDocumentReturns(makeStreamDoc(), nil)
+		_, _, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to pin briefing announcement"))
+	})
+
+	It("returns error when CreateBriefingEvent fails", func() {
+		stub.createGuildScheduledEventFn = func(guildID snowflake.ID, e dgo.GuildScheduledEventCreate, opts ...rest.RequestOpt) (*dgo.GuildScheduledEvent, error) {
+			return nil, fmt.Errorf("event creation failed")
+		}
+		fakeDocs.GetDocumentReturns(makeStreamDoc(), nil)
+		_, _, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to create briefing event"))
+	})
+
+	It("happy path with NextRound.Track == '' (no file written, msg contains round name, empty attachment)", func() {
+		fakeDocs.GetDocumentReturns(makeStreamDoc(), nil)
+		msg, attachment, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(msg).To(ContainSubstring("Round"))
+		Expect(attachment).To(BeEmpty())
+	})
+
+	It("happy path with NextRound.Track != '' (attachment non-empty, msg contains penalty tracker link)", func() {
+		roundConfig.NextRound.Track = "Silverstone"
+		roundConfig.NextRound.Number = 3
+		fakeDocs.GetDocumentReturns(makeStreamDoc(), nil)
+
+		sgServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "entrylist") {
+				_, _ = w.Write([]byte(`{"entries":[]}`))
+			} else if strings.Contains(r.URL.Path, "participating_users") {
+				_, _ = w.Write([]byte(`[]`))
+			} else {
+				// Default case: championships endpoint for GetNextRound
+				_, _ = w.Write([]byte(`{"races":[{"track":{"name":"Round1"}},{"track":{"name":"Round2"}},{"track":{"name":"Silverstone"}}]}`))
+			}
+		})
+
+		msg, attachment, err := client.runRaceSetup(roundConfig, sgClient, gcClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(attachment).NotTo(BeEmpty())
+		Expect(msg).To(ContainSubstring("Penalty Tracker"))
+
+		// Clean up the written file
+		if attachment != "" {
+			_ = os.Remove(attachment)
+		}
 	})
 })
