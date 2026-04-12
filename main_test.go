@@ -86,6 +86,15 @@ var _ = Describe("Runner.before", func() {
 	})
 })
 
+var _ = Describe("newRunner", func() {
+	It("returns a runner with non-nil factory functions", func() {
+		r := newRunner()
+		Expect(r.loadConfig).NotTo(BeNil())
+		Expect(r.newGCloudClient).NotTo(BeNil())
+		Expect(r.newDiscordClient).NotTo(BeNil())
+	})
+})
+
 var _ = Describe("Runner.bot", func() {
 	var (
 		r      *Runner

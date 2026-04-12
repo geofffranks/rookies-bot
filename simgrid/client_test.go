@@ -102,6 +102,16 @@ var _ = Describe("SimGridClient", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("HTTP request failure"))
 		})
+
+		It("returns error when server returns 200 with non-JSON body", func() {
+			mux.HandleFunc("/championships/champ1/participating_users", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`}{not json at all`))
+			})
+
+			_, err := client.UsersForChampionship("champ1")
+			Expect(err).To(HaveOccurred())
+		})
 	})
 
 	Describe("GetNextRound", func() {
