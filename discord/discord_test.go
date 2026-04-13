@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/disgoorg/disgo/rest"
 	dgo "github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/geofffranks/rookies-bot/config"
 	"github.com/geofffranks/rookies-bot/discord"

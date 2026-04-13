@@ -17,10 +17,10 @@ import (
 	"github.com/geofffranks/rookies-bot/gcloud/fakes"
 	"github.com/geofffranks/rookies-bot/models"
 	"github.com/geofffranks/rookies-bot/simgrid"
-	"google.golang.org/api/docs/v1"
-	drive "google.golang.org/api/drive/v3"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"google.golang.org/api/docs/v1"
+	drive "google.golang.org/api/drive/v3"
 )
 
 // snowflakeID converts a uint64 to snowflake.ID for test readability.
@@ -509,10 +509,10 @@ var _ = Describe("runRaceSetup", func() {
 
 		client = NewTestDiscordClient(stub, snowflakeID(1), &config.Config{
 			BotConfig: config.BotConfig{
-				DiscordChannelId:          snowflakeID(111),
-				DiscordBriefingChannelId:  snowflakeID(222),
-				DiscordRoleName:           "test-role",
-				Season:                    "S1",
+				DiscordChannelId:         snowflakeID(111),
+				DiscordBriefingChannelId: snowflakeID(222),
+				DiscordRoleName:          "test-role",
+				Season:                   "S1",
 			},
 		}, gcClient)
 
@@ -826,10 +826,10 @@ var _ = Describe("generateNextRoundConfig", func() {
 		}
 		conf = &config.Config{
 			BotConfig: config.BotConfig{
-				ChampionshipId:    "champ-123",
-				Season:            "S1",
+				ChampionshipId:       "champ-123",
+				Season:               "S1",
 				TrackerTemplateDocID: "template-123",
-				TrackerFolderID:   "folder-456",
+				TrackerFolderID:      "folder-456",
 			},
 			RoundConfig: config.RoundConfig{
 				NextRound: config.Round{Number: 3, Track: "Spa"},
