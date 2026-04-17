@@ -75,7 +75,9 @@ func Load(botConfigPath, roundConfigPath string) (*Config, error) {
 		BotConfig:   *botConfig,
 		RoundConfig: *roundConfig,
 	}
-	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.GoogleServiceAccountToken)
+	if err := os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", config.GoogleServiceAccountToken); err != nil {
+		return nil, fmt.Errorf("failed setting GOOGLE_APPLICATION_CREDENTIALS: %w", err)
+	}
 	return config, nil
 }
 
