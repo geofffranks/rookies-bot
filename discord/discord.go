@@ -210,7 +210,7 @@ func sendBotResponse(event *events.MessageCreate, msg, attachment string) {
 			},
 		}
 		if attachment != "" {
-			file, err := os.Open(attachment)
+			file, err := os.Open(attachment) // #nosec G304 -- path written by this process from config, not user input
 			if err != nil {
 				fmt.Printf("Error attaching file %s: %s\n", attachment, err)
 			}
