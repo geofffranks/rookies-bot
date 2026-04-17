@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC.
+// Copyright 2025 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -6,7 +6,7 @@
 
 // Package docs provides access to the Google Docs API.
 //
-// For product documentation, see: https://developers.google.com/docs/
+// For product documentation, see: https://developers.google.com/workspace/docs/
 //
 // # Library status
 //
@@ -62,11 +62,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
+	"github.com/googleapis/gax-go/v2/internallog"
 	googleapi "google.golang.org/api/googleapi"
 	internal "google.golang.org/api/internal"
 	gensupport "google.golang.org/api/internal/gensupport"
@@ -90,6 +92,7 @@ var _ = strings.Replace
 var _ = context.Canceled
 var _ = internaloption.WithDefaultEndpoint
 var _ = internal.Version
+var _ = internallog.New
 
 const apiId = "docs:v1"
 const apiName = "docs"
@@ -136,10 +139,8 @@ func NewService(ctx context.Context, opts ...option.ClientOption) (*Service, err
 	if err != nil {
 		return nil, err
 	}
-	s, err := New(client)
-	if err != nil {
-		return nil, err
-	}
+	s := &Service{client: client, BasePath: basePath, logger: internaloption.GetLogger(opts)}
+	s.Documents = NewDocumentsService(s)
 	if endpoint != "" {
 		s.BasePath = endpoint
 	}
@@ -155,13 +156,12 @@ func New(client *http.Client) (*Service, error) {
 	if client == nil {
 		return nil, errors.New("client is nil")
 	}
-	s := &Service{client: client, BasePath: basePath}
-	s.Documents = NewDocumentsService(s)
-	return s, nil
+	return NewService(context.TODO(), option.WithHTTPClient(client))
 }
 
 type Service struct {
 	client    *http.Client
+	logger    *slog.Logger
 	BasePath  string // API endpoint base URL
 	UserAgent string // optional additional User-Agent fragment
 
@@ -786,7 +786,7 @@ func (s CreateParagraphBulletsRequest) MarshalJSON() ([]byte, error) {
 // rectangle is positioned inside of the image's original bounding rectangle. -
 // If the offset is negative or greater than 1, the corresponding edge of crop
 // rectangle is positioned outside of the image's original bounding rectangle.
-// - If all offsets and rotation angle are 0, the image is not cropped.
+// - If all offsets and rotation angles are 0, the image is not cropped.
 type CropProperties struct {
 	// Angle: The clockwise rotation angle of the crop rectangle around its center,
 	// in radians. Rotation is applied after the offsets.
@@ -1366,7 +1366,7 @@ type DocumentStyle struct {
 	// UseCustomHeaderFooterMargins: Indicates whether DocumentStyle margin_header,
 	// SectionStyle margin_header and DocumentStyle margin_footer, SectionStyle
 	// margin_footer are respected. When false, the default values in the Docs
-	// editor for header and footer margin are used. This property is read-only.
+	// editor for header and footer margin is used. This property is read-only.
 	UseCustomHeaderFooterMargins bool `json:"useCustomHeaderFooterMargins,omitempty"`
 	// UseEvenPageHeaderFooter: Indicates whether to use the even page header /
 	// footer IDs for the even pages.
@@ -2930,18 +2930,18 @@ type NestingLevel struct {
 	// order within the list.
 	GlyphFormat string `json:"glyphFormat,omitempty"`
 	// GlyphSymbol: A custom glyph symbol used by bullets when paragraphs at this
-	// level of nesting are unordered. The glyph symbol replaces placeholders
-	// within the glyph_format. For example, if the glyph_symbol is the solid
-	// circle corresponding to Unicode U+25cf code point and the glyph_format is
-	// `%0`, the rendered glyph would be the solid circle.
+	// level of nesting is unordered. The glyph symbol replaces placeholders within
+	// the glyph_format. For example, if the glyph_symbol is the solid circle
+	// corresponding to Unicode U+25cf code point and the glyph_format is `%0`, the
+	// rendered glyph would be the solid circle.
 	GlyphSymbol string `json:"glyphSymbol,omitempty"`
 	// GlyphType: The type of glyph used by bullets when paragraphs at this level
-	// of nesting are ordered. The glyph type determines the type of glyph used to
+	// of nesting is ordered. The glyph type determines the type of glyph used to
 	// replace placeholders within the glyph_format when paragraphs at this level
 	// of nesting are ordered. For example, if the nesting level is 0, the
 	// glyph_format is `%0.` and the glyph type is DECIMAL, then the rendered glyph
 	// would replace the placeholder `%0` in the glyph format with a number
-	// corresponding to list item's order within the list.
+	// corresponding to the list item's order within the list.
 	//
 	// Possible values:
 	//   "GLYPH_TYPE_UNSPECIFIED" - The glyph type is unspecified or unsupported.
@@ -4567,6 +4567,11 @@ type SubstringMatchCriteria struct {
 	// MatchCase: Indicates whether the search should respect case: - `True`: the
 	// search is case sensitive. - `False`: the search is case insensitive.
 	MatchCase bool `json:"matchCase,omitempty"`
+	// SearchByRegex: Optional. True if the find value should be treated as a
+	// regular expression. Any backslashes in the pattern should be escaped. -
+	// `True`: the search text is treated as a regular expressions. - `False`: the
+	// search text is treated as a substring for matching.
+	SearchByRegex bool `json:"searchByRegex,omitempty"`
 	// Text: The text to search for in the document.
 	Text string `json:"text,omitempty"`
 	// ForceSendFields is a list of field names (e.g. "MatchCase") to
@@ -6025,8 +6030,7 @@ func (c *DocumentsBatchUpdateCall) Header() http.Header {
 
 func (c *DocumentsBatchUpdateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := gensupport.SetHeaders(c.s.userAgent(), "application/json", c.header_)
-	var body io.Reader = nil
-	body, err := googleapi.WithoutDataWrapper.JSONReader(c.batchupdatedocumentrequest)
+	body, err := googleapi.WithoutDataWrapper.JSONBuffer(c.batchupdatedocumentrequest)
 	if err != nil {
 		return nil, err
 	}
@@ -6042,6 +6046,7 @@ func (c *DocumentsBatchUpdateCall) doRequest(alt string) (*http.Response, error)
 	googleapi.Expand(req.URL, map[string]string{
 		"documentId": c.documentId,
 	})
+	c.s.logger.DebugContext(c.ctx_, "api request", "serviceName", apiName, "rpcName", "docs.documents.batchUpdate", "request", internallog.HTTPRequest(req, body.Bytes()))
 	return gensupport.SendRequest(c.ctx_, c.s.client, req)
 }
 
@@ -6077,9 +6082,11 @@ func (c *DocumentsBatchUpdateCall) Do(opts ...googleapi.CallOption) (*BatchUpdat
 		},
 	}
 	target := &ret
-	if err := gensupport.DecodeResponse(target, res); err != nil {
+	b, err := gensupport.DecodeResponseBytes(target, res)
+	if err != nil {
 		return nil, err
 	}
+	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "docs.documents.batchUpdate", "response", internallog.HTTPResponse(res, b))
 	return ret, nil
 }
 
@@ -6125,8 +6132,7 @@ func (c *DocumentsCreateCall) Header() http.Header {
 
 func (c *DocumentsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := gensupport.SetHeaders(c.s.userAgent(), "application/json", c.header_)
-	var body io.Reader = nil
-	body, err := googleapi.WithoutDataWrapper.JSONReader(c.document)
+	body, err := googleapi.WithoutDataWrapper.JSONBuffer(c.document)
 	if err != nil {
 		return nil, err
 	}
@@ -6139,6 +6145,7 @@ func (c *DocumentsCreateCall) doRequest(alt string) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header = reqHeaders
+	c.s.logger.DebugContext(c.ctx_, "api request", "serviceName", apiName, "rpcName", "docs.documents.create", "request", internallog.HTTPRequest(req, body.Bytes()))
 	return gensupport.SendRequest(c.ctx_, c.s.client, req)
 }
 
@@ -6173,9 +6180,11 @@ func (c *DocumentsCreateCall) Do(opts ...googleapi.CallOption) (*Document, error
 		},
 	}
 	target := &ret
-	if err := gensupport.DecodeResponse(target, res); err != nil {
+	b, err := gensupport.DecodeResponseBytes(target, res)
+	if err != nil {
 		return nil, err
 	}
+	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "docs.documents.create", "response", internallog.HTTPResponse(res, b))
 	return ret, nil
 }
 
@@ -6279,12 +6288,11 @@ func (c *DocumentsGetCall) doRequest(alt string) (*http.Response, error) {
 	if c.ifNoneMatch_ != "" {
 		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
 	}
-	var body io.Reader = nil
 	c.urlParams_.Set("alt", alt)
 	c.urlParams_.Set("prettyPrint", "false")
 	urls := googleapi.ResolveRelative(c.s.BasePath, "v1/documents/{documentId}")
 	urls += "?" + c.urlParams_.Encode()
-	req, err := http.NewRequest("GET", urls, body)
+	req, err := http.NewRequest("GET", urls, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -6292,6 +6300,7 @@ func (c *DocumentsGetCall) doRequest(alt string) (*http.Response, error) {
 	googleapi.Expand(req.URL, map[string]string{
 		"documentId": c.documentId,
 	})
+	c.s.logger.DebugContext(c.ctx_, "api request", "serviceName", apiName, "rpcName", "docs.documents.get", "request", internallog.HTTPRequest(req, nil))
 	return gensupport.SendRequest(c.ctx_, c.s.client, req)
 }
 
@@ -6326,8 +6335,10 @@ func (c *DocumentsGetCall) Do(opts ...googleapi.CallOption) (*Document, error) {
 		},
 	}
 	target := &ret
-	if err := gensupport.DecodeResponse(target, res); err != nil {
+	b, err := gensupport.DecodeResponseBytes(target, res)
+	if err != nil {
 		return nil, err
 	}
+	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "docs.documents.get", "response", internallog.HTTPResponse(res, b))
 	return ret, nil
 }
