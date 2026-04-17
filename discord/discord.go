@@ -96,7 +96,7 @@ func writeNextRoundConfig(conf *config.RoundConfig, season string) (string, erro
 	}
 
 	nextConfigFileName := strings.ToLower(fmt.Sprintf("%s-round-%d-%s.yml", season, conf.NextRound.Number, strings.ReplaceAll(conf.NextRound.Track, " ", "-")))
-	err = os.WriteFile(nextConfigFileName, data, 0644)
+	err = os.WriteFile(nextConfigFileName, data, 0600)
 	if err != nil {
 		return "", err
 	}
