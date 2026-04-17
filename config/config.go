@@ -86,7 +86,7 @@ func LoadRoundConfig(content []byte) (*RoundConfig, error) {
 
 	err := yaml.Unmarshal(content, roundConfig)
 	if err != nil {
-		return nil, fmt.Errorf("Failed parsing YAML data: %s. Use something like https://yaml-online-parser.appspot.com to find the syntax error and try again.", err)
+		return nil, fmt.Errorf("failed parsing YAML data: %s. Use something like https://yaml-online-parser.appspot.com to find the syntax error and try again", err)
 	}
 	return roundConfig, nil
 }
@@ -94,12 +94,12 @@ func LoadRoundConfig(content []byte) (*RoundConfig, error) {
 func loadFile(file string, config interface{}) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		return fmt.Errorf("Failed reading %s: %s", file, err)
+		return fmt.Errorf("failed reading %s: %s", file, err)
 	}
 
 	err = yaml.Unmarshal(data, config)
 	if err != nil {
-		return fmt.Errorf("Failed parsing %s: %s", file, err)
+		return fmt.Errorf("failed parsing %s: %s", file, err)
 	}
 	return nil
 }

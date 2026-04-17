@@ -46,7 +46,7 @@ next_round:
 	It("returns an error for invalid YAML", func() {
 		_, err := config.LoadRoundConfig([]byte("}{garbage"))
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("Failed parsing YAML data"))
+		Expect(err.Error()).To(ContainSubstring("failed parsing YAML data"))
 	})
 
 	It("returns empty struct for empty input", func() {
@@ -120,13 +120,13 @@ previous_round:
 	It("returns an error when bot config file does not exist", func() {
 		_, err := config.Load("/no/such/file.yml", "")
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("Failed reading"))
+		Expect(err.Error()).To(ContainSubstring("failed reading"))
 	})
 
 	It("returns an error when round config file does not exist", func() {
 		_, err := config.Load(botConfigPath, "/no/such/round.yml")
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("Failed reading"))
+		Expect(err.Error()).To(ContainSubstring("failed reading"))
 	})
 
 	It("returns an error when bot config has invalid YAML", func() {
@@ -134,6 +134,6 @@ previous_round:
 		Expect(err).NotTo(HaveOccurred())
 		_, err = config.Load(botConfigPath, "")
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("Failed parsing"))
+		Expect(err.Error()).To(ContainSubstring("failed parsing"))
 	})
 })
