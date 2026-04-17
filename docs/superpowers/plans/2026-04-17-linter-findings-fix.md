@@ -6,9 +6,9 @@
 
 **Architecture:** Fixes split into two buckets:
 1. **Mechanical rewrites** — `ST1005` (lowercase error strings, strip trailing punctuation) and `S1005` (remove blank-ident). Existing `Ginkgo` tests assert on the error strings via `ContainSubstring`, so test assertions must be updated in lockstep with the production code.
-2. **Security-judgment annotations** — `gosec` findings that are either (a) real fixes (G306 perms, G104 error propagation) or (b) justified suppressions (G304 user-supplied config paths, G107 Discord CDN URL). The `local_llm` MCP tool (qwen) is used to draft `#nosec` justification comments and the final commit message — short text-transform tasks that fit its sweet spot.
+2. **Security-judgment annotations** — `gosec` findings that are either (a) real fixes (G306 perms, G104 error propagation) or (b) justified suppressions (G304 user-supplied config paths, G107 Discord CDN URL). The **LM Studio MCP** (server name `lm-studio`, backed by qwen 3.5) is used to draft `#nosec` justification comments — a short text-transform task that fits its sweet spot.
 
-**Tech Stack:** Go 1.25, Ginkgo v2, staticcheck (via `go tool`), gosec v2 (via `go tool`), `local_llm` MCP (qwen 3.5).
+**Tech Stack:** Go 1.25, Ginkgo v2, staticcheck (via `go tool`), gosec v2 (via `go tool`), LM Studio MCP (`lm-studio` server, qwen 3.5).
 
 **Pre-flight:** Verify baseline.
 
@@ -281,9 +281,9 @@ git commit -m "lint: propagate os.Setenv error in config.Load (G104)"
 
 **Context:** `loadFile` reads paths supplied by the operator via CLI args (`bot_config_path`, `round_config_path`). The operator is trusted; there is no external caller. `#nosec G304` with justification is the correct resolution.
 
-- [ ] **Step 1: Draft the justification comment via `local_llm`**
+- [ ] **Step 1: Draft the justification comment via the `lm-studio` MCP**
 
-Call the `local_llm` MCP tool with this prompt (goal: one-line rationale, ≤100 chars, suitable for a `#nosec` trailing comment):
+Call the LM Studio MCP tool (server name `lm-studio`, backed by qwen 3.5) with this prompt (goal: one-line rationale, ≤100 chars, suitable for a `#nosec` trailing comment):
 
 ```
 Draft a one-line justification (≤100 chars, no leading "#") for a Go `#nosec G304` suppression.
@@ -293,7 +293,7 @@ config file whose path comes from a trusted operator via CLI args in a Discord b
 is no network-facing caller. Return only the sentence, no quotes, no prose around it.
 ```
 
-Use the returned text as `<REASON>` in Step 2. If `local_llm` is unavailable, fall back to: `operator-supplied CLI path, no external caller`.
+Use the returned text as `<REASON>` in Step 2. If the `lm-studio` MCP is unavailable, fall back to: `operator-supplied CLI path, no external caller`.
 
 - [ ] **Step 2: Apply the `#nosec` annotation**
 
@@ -329,9 +329,9 @@ git commit -m "lint: suppress G304 on operator-supplied config path"
 
 **Context:** `sendBotResponse` calls `os.Open(attachment)` where `attachment` is a filename this process itself wrote earlier in the same request via `writeNextRoundConfig`. The name is constructed from config values, not external input.
 
-- [ ] **Step 1: Draft justification via `local_llm`**
+- [ ] **Step 1: Draft justification via the `lm-studio` MCP**
 
-Prompt:
+Call the LM Studio MCP tool (server `lm-studio`, qwen 3.5) with this prompt:
 ```
 Draft a one-line justification (≤100 chars, no leading "#") for a Go `#nosec G304`
 suppression.
@@ -341,7 +341,7 @@ that this same process wrote moments earlier via `os.WriteFile` using a name bui
 the round config (season, round number, track). No external input reaches the path.
 Return only the sentence.
 ```
-Fallback if unavailable: `path written by this process from config, not user input`.
+Fallback if the `lm-studio` MCP is unavailable: `path written by this process from config, not user input`.
 
 - [ ] **Step 2: Apply the `#nosec` annotation**
 
@@ -377,9 +377,9 @@ git commit -m "lint: suppress G304 on self-written attachment path"
 
 **Context:** `downloadAttachment` calls `http.Get(url)` where `url` is `events.MessageCreate` → `attachments[0].URL` — a Discord CDN URL supplied by Discord itself. Discord is the trust boundary here.
 
-- [ ] **Step 1: Draft justification via `local_llm`**
+- [ ] **Step 1: Draft justification via the `lm-studio` MCP**
 
-Prompt:
+Call the LM Studio MCP tool (server `lm-studio`, qwen 3.5) with this prompt:
 ```
 Draft a one-line justification (≤100 chars, no leading "#") for a Go `#nosec G107`
 suppression.
@@ -388,7 +388,7 @@ Context: `http.Get(url)` where `url` is a Discord CDN attachment URL from a mess
 event we already chose to process. Discord is the trust boundary. Return only the
 sentence.
 ```
-Fallback if unavailable: `Discord CDN attachment URL from trusted message event`.
+Fallback if the `lm-studio` MCP is unavailable: `Discord CDN attachment URL from trusted message event`.
 
 - [ ] **Step 2: Apply the `#nosec` annotation**
 
@@ -453,4 +453,4 @@ Output to user: **"All linter findings resolved. Run `make deploy` to push to pr
 - **Test lockstep:** `ContainSubstring` assertions updated alongside every error-string change (T1–T3).
 - **No placeholders:** `<REASON>` is filled in by the `local_llm` step immediately before use; concrete fallback supplied for each.
 - **Type consistency:** no new types; signatures unchanged except `config.Load` still returns `(*Config, error)` after T6.
-- **Local LLM usage:** drafting three short `#nosec` justifications (T7–T9) — fits the "text transform from a clear prompt" sweet spot. Mechanical edits stay with direct `Edit` because a precise one-char change is faster and more reliable than a round-trip.
+- **LM Studio MCP usage:** drafting three short `#nosec` justifications (T7–T9) via the `lm-studio` server (qwen 3.5) — fits the "text transform from a clear prompt" sweet spot. Mechanical edits stay with direct `Edit` because a precise one-char change is faster and more reliable than a round-trip.
