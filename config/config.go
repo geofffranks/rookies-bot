@@ -94,7 +94,7 @@ func LoadRoundConfig(content []byte) (*RoundConfig, error) {
 }
 
 func loadFile(file string, config interface{}) error {
-	data, err := os.ReadFile(file)
+	data, err := os.ReadFile(file) // #nosec G304 -- operator-supplied CLI path, no external caller
 	if err != nil {
 		return fmt.Errorf("failed reading %s: %s", file, err)
 	}
