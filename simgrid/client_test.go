@@ -215,7 +215,7 @@ var _ = Describe("SimGridClient", func() {
 			})
 			_, err := client.BuildDriverLookup("champ1")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("Unknown driver"))
+			Expect(err.Error()).To(ContainSubstring("unknown driver"))
 		})
 
 		It("returns an error when the user API fails", func() {

@@ -154,7 +154,7 @@ func (sgc *SimGridClient) BuildDriverLookup(id string) (models.DriverLookup, err
 			if _, ok := userLookup[driver.PlayerID]; ok {
 				userLookup[driver.PlayerID].CarNumber = entry.CarNumber
 			} else {
-				return nil, fmt.Errorf("Unknown driver: %#v", driver)
+				return nil, fmt.Errorf("unknown driver: %#v", driver)
 			}
 		}
 	}
