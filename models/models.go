@@ -56,7 +56,7 @@ func uniqueDrivers(drivers []Driver) []int {
 	}
 
 	carNumbers := []int{}
-	for num, _ := range l {
+	for num := range l {
 		carNumbers = append(carNumbers, num)
 	}
 	return carNumbers
