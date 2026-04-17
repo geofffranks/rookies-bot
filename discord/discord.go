@@ -173,7 +173,7 @@ func buildPenalizedDriverList(driverLookup models.DriverLookup, carNumbers []int
 		if driver, ok := driverLookup[carNumber]; ok {
 			driverList = append(driverList, driver)
 		} else {
-			return nil, fmt.Errorf("could not find driver %d in registered SimGrid drivers. Please double check the car number and try again. Drivers may have changed their number, or withdrawn since the last race.", carNumber)
+			return nil, fmt.Errorf("could not find driver %d in registered SimGrid drivers. Please double check the car number and try again. Drivers may have changed their number, or withdrawn since the last race", carNumber)
 		}
 	}
 	return driverList, nil
@@ -230,27 +230,27 @@ func sendBotResponse(event *events.MessageCreate, msg, attachment string) {
 func (d *DiscordClient) runAnnouncePenalties(roundConfig *config.RoundConfig, sgClient *simgrid.SimGridClient) (string, string, error) {
 	driverLookup, err := sgClient.BuildDriverLookup(d.conf.ChampionshipId)
 	if err != nil {
-		return "", "", fmt.Errorf("Failed building driver list: %w", err)
+		return "", "", fmt.Errorf("failed building driver list: %w", err)
 	}
 
 	penaltyList, err := buildPenaltyList(driverLookup, roundConfig)
 	if err != nil {
-		return "", "", fmt.Errorf("Failed generating penalty summary: %w", err)
+		return "", "", fmt.Errorf("failed generating penalty summary: %w", err)
 	}
 
 	msg, err := d.BuildPenaltyMessage(penaltyList, roundConfig)
 	if err != nil {
-		return "", "", fmt.Errorf("Failed to generate penalty message: %w", err)
+		return "", "", fmt.Errorf("failed to generate penalty message: %w", err)
 	}
 
 	sentMsg, err := d.SendMessage(msg)
 	if err != nil {
-		return "", "", fmt.Errorf("Failed to send penalty announcement: %w", err)
+		return "", "", fmt.Errorf("failed to send penalty announcement: %w", err)
 	}
 
 	err = d.Repin(sentMsg)
 	if err != nil {
-		return "", "", fmt.Errorf("Failed to pin penalty announcement: %w", err)
+		return "", "", fmt.Errorf("failed to pin penalty announcement: %w", err)
 	}
 
 	return fmt.Sprintf("Ok, I have announced penalties from %s", roundConfig.PreviousRound), "", nil

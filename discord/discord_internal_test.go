@@ -387,14 +387,14 @@ var _ = Describe("runAnnouncePenalties", func() {
 		})
 		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("Failed building driver list"))
+		Expect(err.Error()).To(ContainSubstring("failed building driver list"))
 	})
 
 	It("returns error when buildPenaltyList fails (unknown car)", func() {
 		roundConfig.Penalties.QualiBansR1 = []int{999}
 		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("Failed generating penalty summary"))
+		Expect(err.Error()).To(ContainSubstring("failed generating penalty summary"))
 	})
 
 	It("returns error when BuildPenaltyMessage fails (GetMembers error)", func() {
@@ -414,7 +414,7 @@ var _ = Describe("runAnnouncePenalties", func() {
 		}
 		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("Failed to generate penalty message"))
+		Expect(err.Error()).To(ContainSubstring("failed to generate penalty message"))
 	})
 
 	It("returns error when SendMessage fails", func() {
@@ -423,7 +423,7 @@ var _ = Describe("runAnnouncePenalties", func() {
 		}
 		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("Failed to send penalty announcement"))
+		Expect(err.Error()).To(ContainSubstring("failed to send penalty announcement"))
 	})
 
 	It("returns error when Repin fails", func() {
@@ -432,7 +432,7 @@ var _ = Describe("runAnnouncePenalties", func() {
 		}
 		_, _, err := client.runAnnouncePenalties(roundConfig, sgClient)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("Failed to pin penalty announcement"))
+		Expect(err.Error()).To(ContainSubstring("failed to pin penalty announcement"))
 	})
 
 	It("returns msg containing previous round name on happy path", func() {
