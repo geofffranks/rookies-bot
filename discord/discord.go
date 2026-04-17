@@ -59,7 +59,7 @@ type DiscordClient struct {
 }
 
 func downloadAttachment(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+	resp, err := http.Get(url) // #nosec G107 -- Discord CDN attachment URL from trusted message event
 	if err != nil {
 		return []byte{}, err
 	}
