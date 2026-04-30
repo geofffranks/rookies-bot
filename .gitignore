@@ -1,10 +1,11 @@
 *.yml
+!.github/**/*.yml
 client_secret*
 *.json
 rookies-bot.exe
-.gitignore
 
 winter-round-1.yaml
 .worktrees
 coverage.out
 rookies-bot
+vendor/**/.gitignore
