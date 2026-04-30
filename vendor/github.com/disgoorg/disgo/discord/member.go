@@ -3,7 +3,7 @@ package discord
 import (
 	"time"
 
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/disgoorg/disgo/internal/flags"
@@ -18,7 +18,7 @@ type Member struct {
 	Avatar                     *string               `json:"avatar"`
 	Banner                     *string               `json:"banner"`
 	RoleIDs                    []snowflake.ID        `json:"roles,omitempty"`
-	JoinedAt                   time.Time             `json:"joined_at"`
+	JoinedAt                   *time.Time            `json:"joined_at"`
 	PremiumSince               *time.Time            `json:"premium_since,omitempty"`
 	Deaf                       bool                  `json:"deaf,omitempty"`
 	Mute                       bool                  `json:"mute,omitempty"`
@@ -110,18 +110,21 @@ type MemberAdd struct {
 
 // MemberUpdate is used to modify a member
 type MemberUpdate struct {
-	ChannelID                  *snowflake.ID             `json:"channel_id,omitempty"`
-	Nick                       *string                   `json:"nick,omitempty"`
-	Roles                      *[]snowflake.ID           `json:"roles,omitempty"`
-	Mute                       *bool                     `json:"mute,omitempty"`
-	Deaf                       *bool                     `json:"deaf,omitempty"`
-	Flags                      *MemberFlags              `json:"flags,omitempty"`
-	CommunicationDisabledUntil *json.Nullable[time.Time] `json:"communication_disabled_until,omitempty"`
+	ChannelID                  *snowflake.ID         `json:"channel_id,omitempty"`
+	Nick                       *string               `json:"nick,omitempty"`
+	Roles                      *[]snowflake.ID       `json:"roles,omitempty"`
+	Mute                       *bool                 `json:"mute,omitempty"`
+	Deaf                       *bool                 `json:"deaf,omitempty"`
+	Flags                      *MemberFlags          `json:"flags,omitempty"`
+	CommunicationDisabledUntil omit.Omit[*time.Time] `json:"communication_disabled_until,omitzero"`
 }
 
 // CurrentMemberUpdate is used to update the current member
 type CurrentMemberUpdate struct {
-	Nick string `json:"nick"`
+	Nick   *string          `json:"nick,omitempty"`
+	Banner omit.Omit[*Icon] `json:"banner,omitzero"`
+	Avatar omit.Omit[*Icon] `json:"avatar,omitzero"`
+	Bio    *string          `json:"bio,omitempty"`
 }
 
 type MemberFlags int
@@ -137,6 +140,7 @@ const (
 	MemberFlagAutomodQuarantinedUsername
 	_
 	MemberFlagDMSettingsUpsellAcknowledged
+	MemberFlagAutomodQuarantinedGuildTag
 	MemberFlagsNone MemberFlags = 0
 )
 

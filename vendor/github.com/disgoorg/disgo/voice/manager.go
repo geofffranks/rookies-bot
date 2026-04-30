@@ -2,6 +2,7 @@ package voice
 
 import (
 	"context"
+	"iter"
 	"log/slog"
 	"sync"
 
@@ -28,8 +29,8 @@ type (
 		// GetConn returns the voice connection for the given guild.
 		GetConn(guildID snowflake.ID) Conn
 
-		// ForEachCon runs the given function for each voice connection. This is thread-safe.
-		ForEachCon(f func(connection Conn))
+		// Conns returns all voice connections. This function is thread-safe.
+		Conns() iter.Seq[Conn]
 
 		// RemoveConn removes the voice connection for the given guild.
 		RemoveConn(guildID snowflake.ID)
@@ -41,20 +42,19 @@ type (
 
 // NewManager creates a new Manager.
 func NewManager(voiceStateUpdateFunc StateUpdateFunc, userID snowflake.ID, opts ...ManagerConfigOpt) Manager {
-	config := DefaultManagerConfig()
-	config.Apply(opts)
-	config.Logger = config.Logger.With(slog.String("name", "voice"))
+	cfg := defaultManagerConfig()
+	cfg.apply(opts)
 
 	return &managerImpl{
-		config:               *config,
+		config:               cfg,
 		voiceStateUpdateFunc: voiceStateUpdateFunc,
 		userID:               userID,
-		conns:                map[snowflake.ID]Conn{},
+		conns:                make(map[snowflake.ID]Conn),
 	}
 }
 
 type managerImpl struct {
-	config               ManagerConfig
+	config               managerConfig
 	voiceStateUpdateFunc StateUpdateFunc
 	userID               snowflake.ID
 
@@ -83,13 +83,13 @@ func (m *managerImpl) HandleVoiceServerUpdate(update gateway.EventVoiceServerUpd
 }
 
 func (m *managerImpl) CreateConn(guildID snowflake.ID) Conn {
-	m.config.Logger.Debug("Creating new voice conn", slog.Int64("guild_id", int64(guildID)))
-	if conn := m.GetConn(guildID); conn != nil {
-		return conn
-	}
-
 	m.connsMu.Lock()
 	defer m.connsMu.Unlock()
+
+	m.config.Logger.Debug("Creating new voice conn", slog.Int64("guild_id", int64(guildID)))
+	if conn, ok := m.conns[guildID]; ok {
+		return conn
+	}
 
 	var once sync.Once
 	removeFunc := func() { once.Do(func() { m.RemoveConn(guildID) }) }
@@ -106,22 +106,28 @@ func (m *managerImpl) GetConn(guildID snowflake.ID) Conn {
 	return m.conns[guildID]
 }
 
-func (m *managerImpl) ForEachCon(f func(connection Conn)) {
-	m.connsMu.Lock()
-	defer m.connsMu.Unlock()
-	for _, connection := range m.conns {
-		f(connection)
+func (m *managerImpl) Conns() iter.Seq[Conn] {
+	return func(yield func(Conn) bool) {
+		m.connsMu.Lock()
+		defer m.connsMu.Unlock()
+		for _, connection := range m.conns {
+			if !yield(connection) {
+				return
+			}
+		}
 	}
 }
 
 func (m *managerImpl) RemoveConn(guildID snowflake.ID) {
-	m.config.Logger.Debug("Removing voice conn", slog.Int64("guild_id", int64(guildID)))
-	conn := m.GetConn(guildID)
-	if conn == nil {
-		return
-	}
 	m.connsMu.Lock()
 	defer m.connsMu.Unlock()
+
+	m.config.Logger.Debug("Removing voice conn", slog.Int64("guild_id", int64(guildID)))
+
+	if _, ok := m.conns[guildID]; !ok {
+		return
+	}
+
 	delete(m.conns, guildID)
 }
 

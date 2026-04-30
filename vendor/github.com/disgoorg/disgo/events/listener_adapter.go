@@ -17,6 +17,9 @@ type ListenerAdapter struct {
 	// heartbeat ack event
 	OnHeartbeatAck func(event *HeartbeatAck)
 
+	// gateway ratelimited event
+	OnGatewayRateLimited func(event *GatewayRateLimited)
+
 	// GuildApplicationCommandPermissionsUpdate
 	OnGuildApplicationCommandPermissionsUpdate func(event *GuildApplicationCommandPermissionsUpdate)
 
@@ -116,6 +119,13 @@ type ListenerAdapter struct {
 	OnGuildMessageReactionRemoveEmoji func(event *GuildMessageReactionRemoveEmoji)
 	OnGuildMessageReactionRemoveAll   func(event *GuildMessageReactionRemoveAll)
 
+	// Guild Soundboard Events
+	OnGuildSoundboardSoundCreate  func(event *GuildSoundboardSoundCreate)
+	OnGuildSoundboardSoundUpdate  func(event *GuildSoundboardSoundUpdate)
+	OnGuildSoundboardSoundDelete  func(event *GuildSoundboardSoundDelete)
+	OnGuildSoundboardSoundsUpdate func(event *GuildSoundboardSoundsUpdate)
+	OnSoundboardSounds            func(event *SoundboardSounds)
+
 	// Guild Voice Events
 	OnVoiceServerUpdate           func(event *VoiceServerUpdate)
 	OnGuildVoiceChannelEffectSend func(event *GuildVoiceChannelEffectSend)
@@ -208,6 +218,11 @@ func (l *ListenerAdapter) OnEvent(event bot.Event) {
 
 	case *HeartbeatAck:
 		if listener := l.OnHeartbeatAck; listener != nil {
+			listener(e)
+		}
+
+	case *GatewayRateLimited:
+		if listener := l.OnGatewayRateLimited; listener != nil {
 			listener(e)
 		}
 
@@ -498,6 +513,28 @@ func (l *ListenerAdapter) OnEvent(event bot.Event) {
 			listener(e)
 		}
 
+	// Guild Soundboard Sound Events
+	case *GuildSoundboardSoundCreate:
+		if listener := l.OnGuildSoundboardSoundCreate; listener != nil {
+			listener(e)
+		}
+	case *GuildSoundboardSoundUpdate:
+		if listener := l.OnGuildSoundboardSoundUpdate; listener != nil {
+			listener(e)
+		}
+	case *GuildSoundboardSoundDelete:
+		if listener := l.OnGuildSoundboardSoundDelete; listener != nil {
+			listener(e)
+		}
+	case *GuildSoundboardSoundsUpdate:
+		if listener := l.OnGuildSoundboardSoundsUpdate; listener != nil {
+			listener(e)
+		}
+	case *SoundboardSounds:
+		if listener := l.OnSoundboardSounds; listener != nil {
+			listener(e)
+		}
+
 	// Guild Voice Events
 	case *VoiceServerUpdate:
 		if listener := l.OnVoiceServerUpdate; listener != nil {
@@ -731,6 +768,6 @@ func (l *ListenerAdapter) OnEvent(event bot.Event) {
 		}
 
 	default:
-		e.Client().Logger().Error("unexpected event received", slog.String("type", fmt.Sprintf("%T", event)), slog.String("data", fmt.Sprintf("%+v", event)))
+		e.Client().Logger.Error("unexpected event received", slog.String("type", fmt.Sprintf("%T", event)), slog.String("data", fmt.Sprintf("%+v", event)))
 	}
 }

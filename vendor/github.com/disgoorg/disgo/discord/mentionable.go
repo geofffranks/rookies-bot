@@ -16,12 +16,14 @@ var (
 	MentionTypeRole            = MentionType{regexp.MustCompile(`<@&(\d+)>`)}
 	MentionTypeChannel         = MentionType{regexp.MustCompile(`<#(\d+)>`)}
 	MentionTypeEmoji           = MentionType{regexp.MustCompile(`<a?:(\w+):(\d+)>`)}
-	MentionTypeTimestamp       = MentionType{regexp.MustCompile(`<t:(?P<time>-?\d{1,17})(?::(?P<format>[tTdDfFR]))?>`)}
+	MentionTypeTimestamp       = MentionType{regexp.MustCompile(`<t:(?P<time>-?\d{1,17})(?::(?P<format>[tTdDfFsSR]))?>`)}
 	MentionTypeSlashCommand    = MentionType{regexp.MustCompile(`</(\w+) ?((\w+)|(\w+ \w+)):(\d+)>`)}
 	MentionTypeHere            = MentionType{regexp.MustCompile(`@here`)}
 	MentionTypeEveryone        = MentionType{regexp.MustCompile(`@everyone`)}
 	MentionTypeGuildNavigation = MentionType{regexp.MustCompile("<id:(browse|customize|guide|linked-roles)>")}
 	MentionTypeLinkedRole      = MentionType{regexp.MustCompile(`<id:linked-roles:(\d+)>`)}
+	MentionTypeEmail           = MentionType{regexp.MustCompile(`<.+@.+>`)}
+	MentionTypePhoneNumber     = MentionType{regexp.MustCompile(`<\+.+>`)}
 )
 
 type Mentionable interface {
@@ -91,4 +93,12 @@ func NavigationLinkedRoles() string {
 
 func NavigationLinkedRole(id snowflake.ID) string {
 	return fmt.Sprintf("<id:linked-roles:%d>", id)
+}
+
+func EmailMention(email string) string {
+	return fmt.Sprintf("<%s>", email)
+}
+
+func PhoneNumberMention(number string) string {
+	return fmt.Sprintf("<%s>", number)
 }

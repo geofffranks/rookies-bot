@@ -2,8 +2,9 @@ package gateway
 
 import (
 	"fmt"
+	"strconv"
 
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/json/v2"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/disgoorg/disgo/discord"
@@ -64,6 +65,7 @@ func (e *Message) UnmarshalJSON(data []byte) error {
 		messageData = d
 
 	case OpcodeReconnect:
+		messageData = MessageDataReconnect{}
 
 	case OpcodeRequestGuildMembers:
 		var d MessageDataRequestGuildMembers
@@ -81,6 +83,12 @@ func (e *Message) UnmarshalJSON(data []byte) error {
 		messageData = d
 
 	case OpcodeHeartbeatACK:
+		messageData = MessageDataHeartbeatACK{}
+
+	case OpcodeRequestSoundboardSounds:
+		var d MessageDataRequestSoundboardSounds
+		err = json.Unmarshal(v.D, &d)
+		messageData = d
 
 	default:
 		var d MessageDataUnknown
@@ -98,6 +106,7 @@ func (e *Message) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MessageData is the interface for all message data types
 type MessageData interface {
 	messageData()
 }
@@ -114,7 +123,12 @@ func UnmarshalEventData(data []byte, eventType EventType) (EventData, error) {
 		eventData = d
 
 	case EventTypeResumed:
-		// no data
+		eventData = EventResumed{}
+
+	case EventTypeRateLimited:
+		var d EventRateLimited
+		err = json.Unmarshal(data, &d)
+		eventData = d
 
 	case EventTypeApplicationCommandPermissionsUpdate:
 		var d EventApplicationCommandPermissionsUpdate
@@ -311,6 +325,26 @@ func UnmarshalEventData(data []byte, eventType EventType) (EventData, error) {
 		err = json.Unmarshal(data, &d)
 		eventData = d
 
+	case EventTypeGuildSoundboardSoundCreate:
+		var d EventGuildSoundboardSoundCreate
+		err = json.Unmarshal(data, &d)
+		eventData = d
+
+	case EventTypeGuildSoundboardSoundUpdate:
+		var d EventGuildSoundboardSoundUpdate
+		err = json.Unmarshal(data, &d)
+		eventData = d
+
+	case EventTypeGuildSoundboardSoundDelete:
+		var d EventGuildSoundboardSoundDelete
+		err = json.Unmarshal(data, &d)
+		eventData = d
+
+	case EventTypeGuildSoundboardSoundsUpdate:
+		var d EventGuildSoundboardSoundsUpdate
+		err = json.Unmarshal(data, &d)
+		eventData = d
+
 	case EventTypeIntegrationCreate:
 		var d EventIntegrationCreate
 		err = json.Unmarshal(data, &d)
@@ -383,6 +417,11 @@ func UnmarshalEventData(data []byte, eventType EventType) (EventData, error) {
 
 	case EventTypePresenceUpdate:
 		var d EventPresenceUpdate
+		err = json.Unmarshal(data, &d)
+		eventData = d
+
+	case EventTypeSoundboardSounds:
+		var d EventSoundboardSounds
 		err = json.Unmarshal(data, &d)
 		eventData = d
 
@@ -465,6 +504,13 @@ func (MessageDataUnknown) messageData() {}
 
 // MessageDataHeartbeat is used to ensure the websocket connection remains open, and disconnect if not.
 type MessageDataHeartbeat int
+
+func (m MessageDataHeartbeat) MarshalJSON() ([]byte, error) {
+	if m == 0 {
+		return []byte("null"), nil
+	}
+	return []byte(strconv.Itoa(int(m))), nil
+}
 
 func (MessageDataHeartbeat) messageData() {}
 
@@ -557,7 +603,7 @@ func WithCompetingActivity(name string, opts ...ActivityOpt) PresenceOpt {
 func withActivity(activity discord.Activity, opts ...ActivityOpt) PresenceOpt {
 	return func(presence *MessageDataPresenceUpdate) {
 		for _, opt := range opts {
-			opt(activity)
+			opt(&activity)
 		}
 		presence.Activities = []discord.Activity{activity}
 	}
@@ -585,11 +631,11 @@ func WithSince(since *int64) PresenceOpt {
 }
 
 // ActivityOpt is a type alias for a function that sets optional data for an Activity
-type ActivityOpt func(activity discord.Activity)
+type ActivityOpt func(activity *discord.Activity)
 
 // WithActivityState sets the Activity.State
 func WithActivityState(state string) ActivityOpt {
-	return func(activity discord.Activity) {
+	return func(activity *discord.Activity) {
 		activity.State = &state
 	}
 }
@@ -614,15 +660,19 @@ type MessageDataResume struct {
 
 func (MessageDataResume) messageData() {}
 
+type MessageDataReconnect struct{}
+
+func (MessageDataReconnect) messageData() {}
+
 // MessageDataRequestGuildMembers is used for fetching all the members of a guild_events. It is recommended you have a strict
 // member caching policy when using this.
 type MessageDataRequestGuildMembers struct {
 	GuildID   snowflake.ID   `json:"guild_id"`
-	Query     *string        `json:"query,omitempty"` //If specified, user_ids must not be entered
-	Limit     *int           `json:"limit,omitempty"` //Must be >=1 if query/user_ids is used, otherwise 0
+	Query     *string        `json:"query,omitempty"` // If specified, user_ids must not be entered
+	Limit     *int           `json:"limit,omitempty"` // Must be >=1 if query/user_ids is used, otherwise 0
 	Presences bool           `json:"presences,omitempty"`
-	UserIDs   []snowflake.ID `json:"user_ids,omitempty"` //If specified, query must not be entered
-	Nonce     string         `json:"nonce,omitempty"`    //All responses are hashed with this nonce, optional
+	UserIDs   []snowflake.ID `json:"user_ids,omitempty"` // If specified, query must not be entered
+	Nonce     string         `json:"nonce,omitempty"`    // All responses are hashed with this nonce, optional
 }
 
 func (MessageDataRequestGuildMembers) messageData() {}
@@ -636,3 +686,13 @@ type MessageDataHello struct {
 }
 
 func (MessageDataHello) messageData() {}
+
+type MessageDataHeartbeatACK struct{}
+
+func (MessageDataHeartbeatACK) messageData() {}
+
+type MessageDataRequestSoundboardSounds struct {
+	GuildIDs []snowflake.ID `json:"guild_ids"`
+}
+
+func (MessageDataRequestSoundboardSounds) messageData() {}

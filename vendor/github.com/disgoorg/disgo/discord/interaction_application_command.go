@@ -3,13 +3,11 @@ package discord
 import (
 	"fmt"
 
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/json/v2"
 	"github.com/disgoorg/snowflake/v2"
 )
 
-var (
-	_ Interaction = (*ApplicationCommandInteraction)(nil)
-)
+var _ Interaction = (*ApplicationCommandInteraction)(nil)
 
 type ApplicationCommandInteraction struct {
 	baseInteraction
@@ -70,22 +68,26 @@ func (i *ApplicationCommandInteraction) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	i.baseInteraction.id = interaction.ID
-	i.baseInteraction.applicationID = interaction.ApplicationID
-	i.baseInteraction.token = interaction.Token
-	i.baseInteraction.version = interaction.Version
-	i.baseInteraction.guild = interaction.Guild
-	i.baseInteraction.guildID = interaction.GuildID
-	i.baseInteraction.channelID = interaction.ChannelID
-	i.baseInteraction.channel = interaction.Channel
-	i.baseInteraction.locale = interaction.Locale
-	i.baseInteraction.guildLocale = interaction.GuildLocale
-	i.baseInteraction.member = interaction.Member
-	i.baseInteraction.user = interaction.User
-	i.baseInteraction.appPermissions = interaction.AppPermissions
-	i.baseInteraction.entitlements = interaction.Entitlements
-	i.baseInteraction.authorizingIntegrationOwners = interaction.AuthorizingIntegrationOwners
-	i.baseInteraction.context = interaction.Context
+	i.id = interaction.ID
+	i.applicationID = interaction.ApplicationID
+	i.token = interaction.Token
+	i.version = interaction.Version
+	i.guild = interaction.Guild
+	i.guildID = interaction.GuildID
+	i.channel = interaction.Channel
+	i.locale = interaction.Locale
+	i.guildLocale = interaction.GuildLocale
+	i.member = interaction.Member
+	i.user = interaction.User
+	i.appPermissions = interaction.AppPermissions
+	i.entitlements = interaction.Entitlements
+	i.authorizingIntegrationOwners = interaction.AuthorizingIntegrationOwners
+	i.context = interaction.Context
+	i.attachmentSizeLimit = interaction.AttachmentSizeLimit
+
+	if i.member != nil && i.guildID != nil {
+		i.member.GuildID = *i.guildID
+	}
 
 	i.Data = interactionData
 	return nil
@@ -104,7 +106,6 @@ func (i ApplicationCommandInteraction) MarshalJSON() ([]byte, error) {
 			Version:                      i.version,
 			Guild:                        i.guild,
 			GuildID:                      i.guildID,
-			ChannelID:                    i.channelID,
 			Channel:                      i.channel,
 			Locale:                       i.locale,
 			GuildLocale:                  i.guildLocale,
@@ -114,6 +115,7 @@ func (i ApplicationCommandInteraction) MarshalJSON() ([]byte, error) {
 			Entitlements:                 i.entitlements,
 			AuthorizingIntegrationOwners: i.authorizingIntegrationOwners,
 			Context:                      i.context,
+			AttachmentSizeLimit:          i.attachmentSizeLimit,
 		},
 		Data: i.Data,
 	})
@@ -304,10 +306,7 @@ func (d SlashCommandInteractionData) Option(name string) (SlashCommandOption, bo
 
 func (d SlashCommandInteractionData) OptString(name string) (string, bool) {
 	if option, ok := d.Option(name); ok {
-		var v string
-		if err := json.Unmarshal(option.Value, &v); err == nil {
-			return v, true
-		}
+		return option.String(), true
 	}
 	return "", false
 }
@@ -321,10 +320,7 @@ func (d SlashCommandInteractionData) String(name string) string {
 
 func (d SlashCommandInteractionData) OptInt(name string) (int, bool) {
 	if option, ok := d.Option(name); ok {
-		var v int
-		if err := json.Unmarshal(option.Value, &v); err == nil {
-			return v, true
-		}
+		return option.Int(), true
 	}
 	return 0, false
 }
@@ -338,10 +334,7 @@ func (d SlashCommandInteractionData) Int(name string) int {
 
 func (d SlashCommandInteractionData) OptBool(name string) (bool, bool) {
 	if option, ok := d.Option(name); ok {
-		var v bool
-		if err := json.Unmarshal(option.Value, &v); err == nil {
-			return v, true
-		}
+		return option.Bool(), true
 	}
 	return false, false
 }
@@ -355,11 +348,9 @@ func (d SlashCommandInteractionData) Bool(name string) bool {
 
 func (d SlashCommandInteractionData) OptUser(name string) (User, bool) {
 	if option, ok := d.Option(name); ok {
-		var userID snowflake.ID
-		if err := json.Unmarshal(option.Value, &userID); err == nil {
-			user, ok := d.Resolved.Users[userID]
-			return user, ok
-		}
+		userID := option.Snowflake()
+		user, ok := d.Resolved.Users[userID]
+		return user, ok
 	}
 	return User{}, false
 }
@@ -373,11 +364,9 @@ func (d SlashCommandInteractionData) User(name string) User {
 
 func (d SlashCommandInteractionData) OptMember(name string) (ResolvedMember, bool) {
 	if option, ok := d.Option(name); ok {
-		var userID snowflake.ID
-		if err := json.Unmarshal(option.Value, &userID); err == nil {
-			user, ok := d.Resolved.Members[userID]
-			return user, ok
-		}
+		userID := option.Snowflake()
+		member, ok := d.Resolved.Members[userID]
+		return member, ok
 	}
 	return ResolvedMember{}, false
 }
@@ -391,11 +380,9 @@ func (d SlashCommandInteractionData) Member(name string) ResolvedMember {
 
 func (d SlashCommandInteractionData) OptChannel(name string) (ResolvedChannel, bool) {
 	if option, ok := d.Option(name); ok {
-		var channelID snowflake.ID
-		if err := json.Unmarshal(option.Value, &channelID); err == nil {
-			channel, ok := d.Resolved.Channels[channelID]
-			return channel, ok
-		}
+		channelID := option.Snowflake()
+		channel, ok := d.Resolved.Channels[channelID]
+		return channel, ok
 	}
 	return ResolvedChannel{}, false
 }
@@ -409,11 +396,9 @@ func (d SlashCommandInteractionData) Channel(name string) ResolvedChannel {
 
 func (d SlashCommandInteractionData) OptRole(name string) (Role, bool) {
 	if option, ok := d.Option(name); ok {
-		var roleID snowflake.ID
-		if err := json.Unmarshal(option.Value, &roleID); err == nil {
-			role, ok := d.Resolved.Roles[roleID]
-			return role, ok
-		}
+		roleID := option.Snowflake()
+		role, ok := d.Resolved.Roles[roleID]
+		return role, ok
 	}
 	return Role{}, false
 }
@@ -425,12 +410,37 @@ func (d SlashCommandInteractionData) Role(name string) Role {
 	return Role{}
 }
 
+// OptMentionable tries to resolve the mentionable option by checking members, users, roles, and channels in that order.
+// It either returns: [ResolvedMember], [User], [ResolvedMember] or [ResolvedChannel]
+func (d SlashCommandInteractionData) OptMentionable(name string) (MentionableValue, bool) {
+	if option, ok := d.Option(name); ok {
+		id := option.Snowflake()
+		if member, ok := d.Resolved.Members[id]; ok {
+			return member, true
+		}
+		if user, ok := d.Resolved.Users[id]; ok {
+			return user, true
+		}
+		if role, ok := d.Resolved.Roles[id]; ok {
+			return role, true
+		}
+		if channel, ok := d.Resolved.Channels[id]; ok {
+			return channel, true
+		}
+	}
+	return nil, false
+}
+
+// Mentionable tries to resolve the mentionable option by checking members, users, roles, and channels in that order.
+// It either returns: [ResolvedMember], [User], [ResolvedMember] or [ResolvedChannel]
+func (d SlashCommandInteractionData) Mentionable(name string) MentionableValue {
+	mentionable, _ := d.OptMentionable(name)
+	return mentionable
+}
+
 func (d SlashCommandInteractionData) OptSnowflake(name string) (snowflake.ID, bool) {
 	if option, ok := d.Option(name); ok {
-		var id snowflake.ID
-		if err := json.Unmarshal(option.Value, &id); err == nil {
-			return id, ok
-		}
+		return option.Snowflake(), true
 	}
 	return 0, false
 }
@@ -444,10 +454,7 @@ func (d SlashCommandInteractionData) Snowflake(name string) snowflake.ID {
 
 func (d SlashCommandInteractionData) OptFloat(name string) (float64, bool) {
 	if option, ok := d.Option(name); ok {
-		var v float64
-		if err := json.Unmarshal(option.Value, &v); err == nil {
-			return v, true
-		}
+		return option.Float(), true
 	}
 	return 0, false
 }
@@ -461,11 +468,9 @@ func (d SlashCommandInteractionData) Float(name string) float64 {
 
 func (d SlashCommandInteractionData) OptAttachment(name string) (Attachment, bool) {
 	if option, ok := d.Option(name); ok {
-		var v snowflake.ID
-		if err := json.Unmarshal(option.Value, &v); err == nil {
-			attachment, ok := d.Resolved.Attachments[v]
-			return attachment, ok
-		}
+		attachmentID := option.Snowflake()
+		attachment, ok := d.Resolved.Attachments[attachmentID]
+		return attachment, ok
 	}
 	return Attachment{}, false
 }
@@ -696,9 +701,7 @@ type MessageCommandResolved struct {
 	Messages map[snowflake.ID]Message `json:"messages,omitempty"`
 }
 
-var (
-	_ ApplicationCommandInteractionData = (*EntryPointCommandInteractionData)(nil)
-)
+var _ ApplicationCommandInteractionData = (*EntryPointCommandInteractionData)(nil)
 
 type rawEntryPointCommandInteractionData struct {
 	ID   snowflake.ID           `json:"id"`

@@ -48,6 +48,7 @@ After v1 is released breaking changes may only happen if the Discord API require
 * [Threads](https://discord.com/developers/docs/topics/threads)
 * [Guild Scheduled Event](https://discord.com/developers/docs/resources/guild-scheduled-event)
 * [Voice](https://discord.com/developers/docs/topics/voice-connections)
+* [DAVE (E2EE)](https://discord.com/developers/docs/topics/voice-connections#endtoend-encryption-dave-protocol)
 
 ### Missing Features
 
@@ -138,6 +139,7 @@ or in these projects:
 * [Reddit-Discord-Bot](https://github.com/TopiSenpai/Reddit-Discord-Bot)
 * [Kitsune-Bot](https://github.com/TopiSenpai/Kitsune-Bot)
 * [KittyBot](https://github.com/KittyBot-Org/KittyBotGo)
+* [subcordant](https://github.com/apkatsikas/subcordant)
 
 ## Libraries for DisGo
 

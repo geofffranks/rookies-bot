@@ -1,7 +1,7 @@
 package discord
 
 import (
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/json/v2"
 	"github.com/disgoorg/snowflake/v2"
 )
 
@@ -96,12 +96,19 @@ const (
 )
 
 const (
+	AuditLogSoundboardSoundCreate AuditLogEvent = iota + 130
+	AuditLogSoundboardSoundUpdate
+	AuditLogSoundboardSoundDelete
+)
+
+const (
 	AuditLogAutoModerationRuleCreate AuditLogEvent = iota + 140
 	AuditLogAutoModerationRuleUpdate
 	AuditLogAutoModerationRuleDelete
 	AuditLogAutoModerationBlockMessage
 	AuditLogAutoModerationFlagToChannel
 	AuditLogAutoModerationUserCommunicationDisabled
+	AuditLogAutoModerationQuarantineUser
 )
 
 const (

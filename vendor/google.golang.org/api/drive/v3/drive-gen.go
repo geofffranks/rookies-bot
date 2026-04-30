@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC.
+// Copyright 2026 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -163,6 +163,7 @@ func NewService(ctx context.Context, opts ...option.ClientOption) (*Service, err
 	s := &Service{client: client, BasePath: basePath, logger: internaloption.GetLogger(opts)}
 	s.About = NewAboutService(s)
 	s.Accessproposals = NewAccessproposalsService(s)
+	s.Approvals = NewApprovalsService(s)
 	s.Apps = NewAppsService(s)
 	s.Changes = NewChangesService(s)
 	s.Channels = NewChannelsService(s)
@@ -201,6 +202,8 @@ type Service struct {
 	About *AboutService
 
 	Accessproposals *AccessproposalsService
+
+	Approvals *ApprovalsService
 
 	Apps *AppsService
 
@@ -247,6 +250,15 @@ func NewAccessproposalsService(s *Service) *AccessproposalsService {
 }
 
 type AccessproposalsService struct {
+	s *Service
+}
+
+func NewApprovalsService(s *Service) *ApprovalsService {
+	rs := &ApprovalsService{s: s}
+	return rs
+}
+
+type ApprovalsService struct {
 	s *Service
 }
 
@@ -493,23 +505,24 @@ func (s AboutTeamDriveThemes) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
-// AccessProposal: The Access Proposal resource for outstanding access
-// proposals on a file
+// AccessProposal: Manage outstanding access proposals on a file.
 type AccessProposal struct {
-	// CreateTime: The creation time
+	// CreateTime: The creation time.
 	CreateTime string `json:"createTime,omitempty"`
-	// FileId: The file id that the proposal for access is on
+	// FileId: The file ID that the proposal for access is on.
 	FileId string `json:"fileId,omitempty"`
-	// ProposalId: The id of the access proposal
+	// ProposalId: The ID of the access proposal.
 	ProposalId string `json:"proposalId,omitempty"`
 	// RecipientEmailAddress: The email address of the user that will receive
-	// permissions if accepted
+	// permissions, if accepted.
 	RecipientEmailAddress string `json:"recipientEmailAddress,omitempty"`
-	// RequestMessage: The message that the requester added to the proposal
+	// RequestMessage: The message that the requester added to the proposal.
 	RequestMessage string `json:"requestMessage,omitempty"`
-	// RequesterEmailAddress: The email address of the requesting user
+	// RequesterEmailAddress: The email address of the requesting user.
 	RequesterEmailAddress string `json:"requesterEmailAddress,omitempty"`
-	// RolesAndViews: A wrapper for the role and view of an access proposal.
+	// RolesAndViews: A wrapper for the role and view of an access proposal. For
+	// more information, see Roles and permissions
+	// (https://developers.google.com/workspace/drive/api/guides/ref-roles).
 	RolesAndViews []*AccessProposalRoleAndView `json:"rolesAndViews,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the server.
@@ -533,14 +546,14 @@ func (s AccessProposal) MarshalJSON() ([]byte, error) {
 }
 
 // AccessProposalRoleAndView: A wrapper for the role and view of an access
-// proposal.
+// proposal. For more information, see Roles and permissions
+// (https://developers.google.com/workspace/drive/api/guides/ref-roles).
 type AccessProposalRoleAndView struct {
-	// Role: The role that was proposed by the requester New values may be added in
-	// the future, but the following are currently possible: * `writer` *
-	// `commenter` * `reader`
+	// Role: The role that was proposed by the requester. The supported values are:
+	// * `writer` * `commenter` * `reader`
 	Role string `json:"role,omitempty"`
 	// View: Indicates the view for this access proposal. Only populated for
-	// proposals that belong to a view. `published` is the only supported value.
+	// proposals that belong to a view. Only `published` is supported.
 	View string `json:"view,omitempty"`
 	// ForceSendFields is a list of field names (e.g. "Role") to unconditionally
 	// include in API requests. By default, fields with empty or default values are
@@ -707,6 +720,92 @@ func (s AppList) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
+// Approval: Metadata for an approval. An approval is a review/approve process
+// for a Drive item.
+type Approval struct {
+	// ApprovalId: The Approval ID.
+	ApprovalId string `json:"approvalId,omitempty"`
+	// CompleteTime: Output only. The time the approval was completed.
+	CompleteTime string `json:"completeTime,omitempty"`
+	// CreateTime: Output only. The time the approval was created.
+	CreateTime string `json:"createTime,omitempty"`
+	// DueTime: The time that the approval is due.
+	DueTime string `json:"dueTime,omitempty"`
+	// Initiator: The user that requested the Approval.
+	Initiator *User `json:"initiator,omitempty"`
+	// Kind: This is always drive#approval.
+	Kind string `json:"kind,omitempty"`
+	// ModifyTime: Output only. The most recent time the approval was modified.
+	ModifyTime string `json:"modifyTime,omitempty"`
+	// ReviewerResponses: The responses made on the Approval by reviewers.
+	ReviewerResponses []*ReviewerResponse `json:"reviewerResponses,omitempty"`
+	// Status: Output only. The status of the approval at the time this resource
+	// was requested.
+	//
+	// Possible values:
+	//   "STATUS_UNSPECIFIED" - Approval status has not been set or was set to an
+	// invalid value.
+	//   "IN_PROGRESS" - The approval process has started and not finished.
+	//   "APPROVED" - The approval process is finished and the target was approved.
+	//   "CANCELLED" - The approval process was cancelled before it finished.
+	//   "DECLINED" - The approval process is finished and the target was declined.
+	Status string `json:"status,omitempty"`
+	// TargetFileId: Target file id of the approval.
+	TargetFileId string `json:"targetFileId,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the server.
+	googleapi.ServerResponse `json:"-"`
+	// ForceSendFields is a list of field names (e.g. "ApprovalId") to
+	// unconditionally include in API requests. By default, fields with empty or
+	// default values are omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-ForceSendFields for more
+	// details.
+	ForceSendFields []string `json:"-"`
+	// NullFields is a list of field names (e.g. "ApprovalId") to include in API
+	// requests with the JSON null value. By default, fields with empty values are
+	// omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-NullFields for more details.
+	NullFields []string `json:"-"`
+}
+
+func (s Approval) MarshalJSON() ([]byte, error) {
+	type NoMethod Approval
+	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
+}
+
+// ApprovalList: The response of an Approvals list request.
+type ApprovalList struct {
+	// Items: The list of Approvals. If nextPageToken is populated, then this list
+	// may be incomplete and an additional page of results should be fetched.
+	Items []*Approval `json:"items,omitempty"`
+	// Kind: This is always drive#approvalList
+	Kind string `json:"kind,omitempty"`
+	// NextPageToken: The page token for the next page of Approvals. This will be
+	// absent if the end of the Approvals list has been reached. If the token is
+	// rejected for any reason, it should be discarded, and pagination should be
+	// restarted from the first page of results.
+	NextPageToken string `json:"nextPageToken,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the server.
+	googleapi.ServerResponse `json:"-"`
+	// ForceSendFields is a list of field names (e.g. "Items") to unconditionally
+	// include in API requests. By default, fields with empty or default values are
+	// omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-ForceSendFields for more
+	// details.
+	ForceSendFields []string `json:"-"`
+	// NullFields is a list of field names (e.g. "Items") to include in API
+	// requests with the JSON null value. By default, fields with empty values are
+	// omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-NullFields for more details.
+	NullFields []string `json:"-"`
+}
+
+func (s ApprovalList) MarshalJSON() ([]byte, error) {
+	type NoMethod ApprovalList
+	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
+}
+
 // Change: A change to a file or shared drive.
 type Change struct {
 	// ChangeType: The type of the change. Possible values are `file` and `drive`.
@@ -840,6 +939,32 @@ func (s Channel) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
+// ClientEncryptionDetails: Details about the client-side encryption applied to
+// the file.
+type ClientEncryptionDetails struct {
+	// DecryptionMetadata: The metadata used for client-side operations.
+	DecryptionMetadata *DecryptionMetadata `json:"decryptionMetadata,omitempty"`
+	// EncryptionState: The encryption state of the file. The values expected here
+	// are: - encrypted - unencrypted
+	EncryptionState string `json:"encryptionState,omitempty"`
+	// ForceSendFields is a list of field names (e.g. "DecryptionMetadata") to
+	// unconditionally include in API requests. By default, fields with empty or
+	// default values are omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-ForceSendFields for more
+	// details.
+	ForceSendFields []string `json:"-"`
+	// NullFields is a list of field names (e.g. "DecryptionMetadata") to include
+	// in API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-NullFields for more details.
+	NullFields []string `json:"-"`
+}
+
+func (s ClientEncryptionDetails) MarshalJSON() ([]byte, error) {
+	type NoMethod ClientEncryptionDetails
+	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
+}
+
 // Comment: A comment on a file. Some resource methods (such as
 // `comments.update`) require a `commentId`. Use the `comments.list` method to
 // retrieve the ID for a comment in a file.
@@ -848,6 +973,9 @@ type Comment struct {
 	// on defining anchor properties, refer to Manage comments and replies
 	// (https://developers.google.com/workspace/drive/api/v3/manage-comments).
 	Anchor string `json:"anchor,omitempty"`
+	// AssigneeEmailAddress: Output only. The email address of the user assigned to
+	// this comment. If no user is assigned, the field is unset.
+	AssigneeEmailAddress string `json:"assigneeEmailAddress,omitempty"`
 	// Author: Output only. The author of the comment. The author's email address
 	// and permission ID will not be populated.
 	Author *User `json:"author,omitempty"`
@@ -866,6 +994,9 @@ type Comment struct {
 	// Kind: Output only. Identifies what kind of resource this is. Value: the
 	// fixed string "drive#comment".
 	Kind string `json:"kind,omitempty"`
+	// MentionedEmailAddresses: Output only. A list of email addresses for users
+	// mentioned in this comment. If no users are mentioned, the list is empty.
+	MentionedEmailAddresses []string `json:"mentionedEmailAddresses,omitempty"`
 	// ModifiedTime: The last time the comment or any of its replies was modified
 	// (RFC 3339 date-time).
 	ModifiedTime string `json:"modifiedTime,omitempty"`
@@ -977,7 +1108,7 @@ type ContentRestriction struct {
 	// mutable on requests that also set `readOnly=true`.
 	Reason string `json:"reason,omitempty"`
 	// RestrictingUser: Output only. The user who set the content restriction. Only
-	// populated if `readOnly` is true.
+	// populated if `readOnly=true`.
 	RestrictingUser *User `json:"restrictingUser,omitempty"`
 	// RestrictionTime: The time at which the content restriction was set
 	// (formatted RFC 3339 timestamp). Only populated if readOnly is true.
@@ -1007,12 +1138,52 @@ func (s ContentRestriction) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
+// DecryptionMetadata: Representation of the CSE DecryptionMetadata.
+type DecryptionMetadata struct {
+	// Aes256GcmChunkSize: Chunk size used if content was encrypted with the AES
+	// 256 GCM Cipher. Possible values are: - default - small
+	Aes256GcmChunkSize string `json:"aes256GcmChunkSize,omitempty"`
+	// EncryptionResourceKeyHash: The URL-safe Base64 encoded HMAC-SHA256 digest of
+	// the resource metadata with its DEK (Data Encryption Key); see
+	// https://developers.google.com/workspace/cse/reference
+	EncryptionResourceKeyHash string `json:"encryptionResourceKeyHash,omitempty"`
+	// Jwt: The signed JSON Web Token (JWT) which can be used to authorize the
+	// requesting user with the Key ACL Service (KACLS). The JWT asserts that the
+	// requesting user has at least read permissions on the file.
+	Jwt string `json:"jwt,omitempty"`
+	// KaclsId: The ID of the KACLS (Key ACL Service) used to encrypt the file.
+	KaclsId int64 `json:"kaclsId,omitempty,string"`
+	// KaclsName: The name of the KACLS (Key ACL Service) used to encrypt the file.
+	KaclsName string `json:"kaclsName,omitempty"`
+	// KeyFormat: Key format for the unwrapped key. Must be `tinkAesGcmKey`.
+	KeyFormat string `json:"keyFormat,omitempty"`
+	// WrappedKey: The URL-safe Base64 encoded wrapped key used to encrypt the
+	// contents of the file.
+	WrappedKey string `json:"wrappedKey,omitempty"`
+	// ForceSendFields is a list of field names (e.g. "Aes256GcmChunkSize") to
+	// unconditionally include in API requests. By default, fields with empty or
+	// default values are omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-ForceSendFields for more
+	// details.
+	ForceSendFields []string `json:"-"`
+	// NullFields is a list of field names (e.g. "Aes256GcmChunkSize") to include
+	// in API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-NullFields for more details.
+	NullFields []string `json:"-"`
+}
+
+func (s DecryptionMetadata) MarshalJSON() ([]byte, error) {
+	type NoMethod DecryptionMetadata
+	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
+}
+
 // DownloadRestriction: A restriction for copy and download of the file.
 type DownloadRestriction struct {
 	// RestrictedForReaders: Whether download and copy is restricted for readers.
 	RestrictedForReaders bool `json:"restrictedForReaders,omitempty"`
 	// RestrictedForWriters: Whether download and copy is restricted for writers.
-	// If true, download is also restricted for readers.
+	// If `true`, download is also restricted for readers.
 	RestrictedForWriters bool `json:"restrictedForWriters,omitempty"`
 	// ForceSendFields is a list of field names (e.g. "RestrictedForReaders") to
 	// unconditionally include in API requests. By default, fields with empty or
@@ -1029,6 +1200,36 @@ type DownloadRestriction struct {
 
 func (s DownloadRestriction) MarshalJSON() ([]byte, error) {
 	type NoMethod DownloadRestriction
+	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
+}
+
+// DownloadRestrictionsMetadata: Download restrictions applied to the file.
+type DownloadRestrictionsMetadata struct {
+	// EffectiveDownloadRestrictionWithContext: Output only. The effective download
+	// restriction applied to this file. This considers all restriction settings
+	// and DLP rules.
+	EffectiveDownloadRestrictionWithContext *DownloadRestriction `json:"effectiveDownloadRestrictionWithContext,omitempty"`
+	// ItemDownloadRestriction: The download restriction of the file applied
+	// directly by the owner or organizer. This doesn't take into account shared
+	// drive settings or DLP rules.
+	ItemDownloadRestriction *DownloadRestriction `json:"itemDownloadRestriction,omitempty"`
+	// ForceSendFields is a list of field names (e.g.
+	// "EffectiveDownloadRestrictionWithContext") to unconditionally include in API
+	// requests. By default, fields with empty or default values are omitted from
+	// API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-ForceSendFields for more
+	// details.
+	ForceSendFields []string `json:"-"`
+	// NullFields is a list of field names (e.g.
+	// "EffectiveDownloadRestrictionWithContext") to include in API requests with
+	// the JSON null value. By default, fields with empty values are omitted from
+	// API requests. See https://pkg.go.dev/google.golang.org/api#hdr-NullFields
+	// for more details.
+	NullFields []string `json:"-"`
+}
+
+func (s DownloadRestrictionsMetadata) MarshalJSON() ([]byte, error) {
+	type NoMethod DownloadRestrictionsMetadata
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
@@ -1176,6 +1377,9 @@ type DriveCapabilities struct {
 	// CanChangeDomainUsersOnlyRestriction: Output only. Whether the current user
 	// can change the `domainUsersOnly` restriction of this shared drive.
 	CanChangeDomainUsersOnlyRestriction bool `json:"canChangeDomainUsersOnlyRestriction,omitempty"`
+	// CanChangeDownloadRestriction: Output only. Whether the current user can
+	// change organizer-applied download restrictions of this shared drive.
+	CanChangeDownloadRestriction bool `json:"canChangeDownloadRestriction,omitempty"`
 	// CanChangeDriveBackground: Output only. Whether the current user can change
 	// the background of this shared drive.
 	CanChangeDriveBackground bool `json:"canChangeDriveBackground,omitempty"`
@@ -1342,7 +1546,15 @@ type File struct {
 	AppProperties map[string]string `json:"appProperties,omitempty"`
 	// Capabilities: Output only. Capabilities the current user has on this file.
 	// Each capability corresponds to a fine-grained action that a user may take.
+	// For more information, see Understand file capabilities
+	// (https://developers.google.com/workspace/drive/api/guides/manage-sharing#capabilities).
 	Capabilities *FileCapabilities `json:"capabilities,omitempty"`
+	// ClientEncryptionDetails: Client Side Encryption related details. Contains
+	// details about the encryption state of the file and details regarding the
+	// encryption mechanism that clients need to use when decrypting the contents
+	// of this item. This will only be present on files and not on folders or
+	// shortcuts.
+	ClientEncryptionDetails *ClientEncryptionDetails `json:"clientEncryptionDetails,omitempty"`
 	// ContentHints: Additional information about the content of the file. These
 	// fields are never populated in responses.
 	ContentHints *FileContentHints `json:"contentHints,omitempty"`
@@ -1350,12 +1562,14 @@ type File struct {
 	// Only populated if such a restriction exists.
 	ContentRestrictions []*ContentRestriction `json:"contentRestrictions,omitempty"`
 	// CopyRequiresWriterPermission: Whether the options to copy, print, or
-	// download this file, should be disabled for readers and commenters.
+	// download this file should be disabled for readers and commenters.
 	CopyRequiresWriterPermission bool `json:"copyRequiresWriterPermission,omitempty"`
 	// CreatedTime: The time at which the file was created (RFC 3339 date-time).
 	CreatedTime string `json:"createdTime,omitempty"`
 	// Description: A short description of the file.
 	Description string `json:"description,omitempty"`
+	// DownloadRestrictions: Download restrictions applied on the file.
+	DownloadRestrictions *DownloadRestrictionsMetadata `json:"downloadRestrictions,omitempty"`
 	// DriveId: Output only. ID of the shared drive the file resides in. Only
 	// populated for items in shared drives.
 	DriveId string `json:"driveId,omitempty"`
@@ -1370,19 +1584,20 @@ type File struct {
 	FileExtension string `json:"fileExtension,omitempty"`
 	// FolderColorRgb: The color for a folder or a shortcut to a folder as an RGB
 	// hex string. The supported colors are published in the `folderColorPalette`
-	// field of the About resource. If an unsupported color is specified, the
-	// closest color in the palette is used instead.
+	// field of the `about` (/workspace/drive/api/reference/rest/v3/about)
+	// resource. If an unsupported color is specified, the closest color in the
+	// palette is used instead.
 	FolderColorRgb string `json:"folderColorRgb,omitempty"`
 	// FullFileExtension: Output only. The full file extension extracted from the
 	// `name` field. May contain multiple concatenated extensions, such as
 	// "tar.gz". This is only available for files with binary content in Google
 	// Drive. This is automatically updated when the `name` field changes, however
-	// it is not cleared if the new name does not contain a valid extension.
+	// it's not cleared if the new name doesn't contain a valid extension.
 	FullFileExtension string `json:"fullFileExtension,omitempty"`
 	// HasAugmentedPermissions: Output only. Whether there are permissions directly
 	// on this file. This field is only populated for items in shared drives.
 	HasAugmentedPermissions bool `json:"hasAugmentedPermissions,omitempty"`
-	// HasThumbnail: Output only. Whether this file has a thumbnail. This does not
+	// HasThumbnail: Output only. Whether this file has a thumbnail. This doesn't
 	// indicate whether the requesting app has access to the thumbnail. To check
 	// access, look for the presence of the thumbnailLink field.
 	HasThumbnail bool `json:"hasThumbnail,omitempty"`
@@ -1421,7 +1636,8 @@ type File struct {
 	// detect an appropriate value from uploaded content, if no value is provided.
 	// The value cannot be changed unless a new revision is uploaded. If a file is
 	// created with a Google Doc MIME type, the uploaded content is imported, if
-	// possible. The supported import formats are published in the About resource.
+	// possible. The supported import formats are published in the `about`
+	// (/workspace/drive/api/reference/rest/v3/about) resource.
 	MimeType string `json:"mimeType,omitempty"`
 	// ModifiedByMe: Output only. Whether the file has been modified by this user.
 	ModifiedByMe bool `json:"modifiedByMe,omitempty"`
@@ -1432,10 +1648,10 @@ type File struct {
 	// date-time). Note that setting modifiedTime will also update modifiedByMeTime
 	// for the user.
 	ModifiedTime string `json:"modifiedTime,omitempty"`
-	// Name: The name of the file. This is not necessarily unique within a folder.
-	// Note that for immutable items such as the top level folders of shared
-	// drives, My Drive root folder, and Application Data folder the name is
-	// constant.
+	// Name: The name of the file. This isn't necessarily unique within a folder.
+	// Note that for immutable items such as the top-level folders of shared
+	// drives, the My Drive root folder, and the Application Data folder, the name
+	// is constant.
 	Name string `json:"name,omitempty"`
 	// OriginalFilename: The original filename of the uploaded content if
 	// available, or else the original value of the `name` field. This is only
@@ -1475,11 +1691,11 @@ type File struct {
 	ResourceKey string `json:"resourceKey,omitempty"`
 	// Sha1Checksum: Output only. The SHA1 checksum associated with this file, if
 	// available. This field is only populated for files with content stored in
-	// Google Drive; it is not populated for Docs Editors or shortcut files.
+	// Google Drive; it's not populated for Docs Editors or shortcut files.
 	Sha1Checksum string `json:"sha1Checksum,omitempty"`
 	// Sha256Checksum: Output only. The SHA256 checksum associated with this file,
 	// if available. This field is only populated for files with content stored in
-	// Google Drive; it is not populated for Docs Editors or shortcut files.
+	// Google Drive; it's not populated for Docs Editors or shortcut files.
 	Sha256Checksum string `json:"sha256Checksum,omitempty"`
 	// Shared: Output only. Whether the file has been shared. Not populated for
 	// items in shared drives.
@@ -1494,11 +1710,11 @@ type File struct {
 	// which have the mimeType field set to `application/vnd.google-apps.shortcut`.
 	// Can only be set on `files.create` requests.
 	ShortcutDetails *FileShortcutDetails `json:"shortcutDetails,omitempty"`
-	// Size: Output only. Size in bytes of blobs and first party editor files.
+	// Size: Output only. Size in bytes of blobs and Google Workspace editor files.
 	// Won't be populated for files that have no size, like shortcuts and folders.
 	Size int64 `json:"size,omitempty,string"`
 	// Spaces: Output only. The list of spaces which contain the file. The
-	// currently supported values are 'drive', 'appDataFolder' and 'photos'.
+	// currently supported values are `drive`, `appDataFolder`, and `photos`.
 	Spaces []string `json:"spaces,omitempty"`
 	// Starred: Whether the user has starred the file.
 	Starred bool `json:"starred,omitempty"`
@@ -1507,17 +1723,17 @@ type File struct {
 	// ThumbnailLink: Output only. A short-lived link to the file's thumbnail, if
 	// available. Typically lasts on the order of hours. Not intended for direct
 	// usage on web applications due to Cross-Origin Resource Sharing (CORS)
-	// (https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) policies, consider
+	// (https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) policies. Consider
 	// using a proxy server. Only populated when the requesting app can access the
 	// file's content. If the file isn't shared publicly, the URL returned in
-	// `Files.thumbnailLink` must be fetched using a credentialed request.
+	// `files.thumbnailLink` must be fetched using a credentialed request.
 	ThumbnailLink string `json:"thumbnailLink,omitempty"`
 	// ThumbnailVersion: Output only. The thumbnail version for use in thumbnail
 	// cache invalidation.
 	ThumbnailVersion int64 `json:"thumbnailVersion,omitempty,string"`
 	// Trashed: Whether the file has been trashed, either explicitly or from a
-	// trashed parent folder. Only the owner may trash a file, and other users
-	// cannot see files in the owner's trash.
+	// trashed parent folder. Only the owner may trash a file, but other users can
+	// still access the file in the owner's trash until it's permanently deleted.
 	Trashed bool `json:"trashed,omitempty"`
 	// TrashedTime: The time that the item was trashed (RFC 3339 date-time). Only
 	// populated for items in shared drives.
@@ -1573,17 +1789,18 @@ func (s File) MarshalJSON() ([]byte, error) {
 
 // FileCapabilities: Output only. Capabilities the current user has on this
 // file. Each capability corresponds to a fine-grained action that a user may
-// take.
+// take. For more information, see Understand file capabilities
+// (https://developers.google.com/workspace/drive/api/guides/manage-sharing#capabilities).
 type FileCapabilities struct {
 	// CanAcceptOwnership: Output only. Whether the current user is the pending
 	// owner of the file. Not populated for shared drive files.
 	CanAcceptOwnership bool `json:"canAcceptOwnership,omitempty"`
 	// CanAddChildren: Output only. Whether the current user can add children to
-	// this folder. This is always false when the item is not a folder.
+	// this folder. This is always `false` when the item isn't a folder.
 	CanAddChildren bool `json:"canAddChildren,omitempty"`
 	// CanAddFolderFromAnotherDrive: Output only. Whether the current user can add
 	// a folder from another drive (different shared drive or My Drive) to this
-	// folder. This is false when the item is not a folder. Only populated for
+	// folder. This is `false` when the item isn't a folder. Only populated for
 	// items in shared drives.
 	CanAddFolderFromAnotherDrive bool `json:"canAddFolderFromAnotherDrive,omitempty"`
 	// CanAddMyDriveParent: Output only. Whether the current user can add a parent
@@ -1593,8 +1810,11 @@ type FileCapabilities struct {
 	// CanChangeCopyRequiresWriterPermission: Output only. Whether the current user
 	// can change the `copyRequiresWriterPermission` restriction of this file.
 	CanChangeCopyRequiresWriterPermission bool `json:"canChangeCopyRequiresWriterPermission,omitempty"`
+	// CanChangeItemDownloadRestriction: Output only. Whether the current user can
+	// change the owner or organizer-applied download restrictions of the file.
+	CanChangeItemDownloadRestriction bool `json:"canChangeItemDownloadRestriction,omitempty"`
 	// CanChangeSecurityUpdateEnabled: Output only. Whether the current user can
-	// change the securityUpdateEnabled field on link share metadata.
+	// change the `securityUpdateEnabled` field on link share metadata.
 	CanChangeSecurityUpdateEnabled bool `json:"canChangeSecurityUpdateEnabled,omitempty"`
 	// CanChangeViewersCanCopyContent: Deprecated: Output only.
 	CanChangeViewersCanCopyContent bool `json:"canChangeViewersCanCopyContent,omitempty"`
@@ -1602,12 +1822,12 @@ type FileCapabilities struct {
 	CanComment bool `json:"canComment,omitempty"`
 	// CanCopy: Output only. Whether the current user can copy this file. For an
 	// item in a shared drive, whether the current user can copy non-folder
-	// descendants of this item, or this item itself if it is not a folder.
+	// descendants of this item, or this item if it's not a folder.
 	CanCopy bool `json:"canCopy,omitempty"`
 	// CanDelete: Output only. Whether the current user can delete this file.
 	CanDelete bool `json:"canDelete,omitempty"`
 	// CanDeleteChildren: Output only. Whether the current user can delete children
-	// of this folder. This is false when the item is not a folder. Only populated
+	// of this folder. This is `false` when the item isn't a folder. Only populated
 	// for items in shared drives.
 	CanDeleteChildren bool `json:"canDeleteChildren,omitempty"`
 	// CanDisableInheritedPermissions: Whether a user can disable inherited
@@ -1623,13 +1843,13 @@ type FileCapabilities struct {
 	// permissions.
 	CanEnableInheritedPermissions bool `json:"canEnableInheritedPermissions,omitempty"`
 	// CanListChildren: Output only. Whether the current user can list the children
-	// of this folder. This is always false when the item is not a folder.
+	// of this folder. This is always `false` when the item isn't a folder.
 	CanListChildren bool `json:"canListChildren,omitempty"`
 	// CanModifyContent: Output only. Whether the current user can modify the
 	// content of this file.
 	CanModifyContent bool `json:"canModifyContent,omitempty"`
 	// CanModifyContentRestriction: Deprecated: Output only. Use one of
-	// `canModifyEditorContentRestriction`, `canModifyOwnerContentRestriction` or
+	// `canModifyEditorContentRestriction`, `canModifyOwnerContentRestriction`, or
 	// `canRemoveContentRestriction`.
 	CanModifyContentRestriction bool `json:"canModifyContentRestriction,omitempty"`
 	// CanModifyEditorContentRestriction: Output only. Whether the current user can
@@ -1642,16 +1862,17 @@ type FileCapabilities struct {
 	// add or modify content restrictions which are owner restricted.
 	CanModifyOwnerContentRestriction bool `json:"canModifyOwnerContentRestriction,omitempty"`
 	// CanMoveChildrenOutOfDrive: Output only. Whether the current user can move
-	// children of this folder outside of the shared drive. This is false when the
-	// item is not a folder. Only populated for items in shared drives.
+	// children of this folder outside of the shared drive. This is `false` when
+	// the item isn't a folder. Only populated for items in shared drives.
 	CanMoveChildrenOutOfDrive bool `json:"canMoveChildrenOutOfDrive,omitempty"`
 	// CanMoveChildrenOutOfTeamDrive: Deprecated: Output only. Use
 	// `canMoveChildrenOutOfDrive` instead.
 	CanMoveChildrenOutOfTeamDrive bool `json:"canMoveChildrenOutOfTeamDrive,omitempty"`
 	// CanMoveChildrenWithinDrive: Output only. Whether the current user can move
-	// children of this folder within this drive. This is false when the item is
-	// not a folder. Note that a request to move the child may still fail depending
-	// on the current user's access to the child and to the destination folder.
+	// children of this folder within this drive. This is `false` when the item
+	// isn't a folder. Note that a request to move the child may still fail
+	// depending on the current user's access to the child and to the destination
+	// folder.
 	CanMoveChildrenWithinDrive bool `json:"canMoveChildrenWithinDrive,omitempty"`
 	// CanMoveChildrenWithinTeamDrive: Deprecated: Output only. Use
 	// `canMoveChildrenWithinDrive` instead.
@@ -1662,15 +1883,15 @@ type FileCapabilities struct {
 	// CanMoveItemOutOfDrive: Output only. Whether the current user can move this
 	// item outside of this drive by changing its parent. Note that a request to
 	// change the parent of the item may still fail depending on the new parent
-	// that is being added.
+	// that's being added.
 	CanMoveItemOutOfDrive bool `json:"canMoveItemOutOfDrive,omitempty"`
 	// CanMoveItemOutOfTeamDrive: Deprecated: Output only. Use
 	// `canMoveItemOutOfDrive` instead.
 	CanMoveItemOutOfTeamDrive bool `json:"canMoveItemOutOfTeamDrive,omitempty"`
 	// CanMoveItemWithinDrive: Output only. Whether the current user can move this
 	// item within this drive. Note that a request to change the parent of the item
-	// may still fail depending on the new parent that is being added and the
-	// parent that is being removed.
+	// may still fail depending on the new parent that's being added and the parent
+	// that is being removed.
 	CanMoveItemWithinDrive bool `json:"canMoveItemWithinDrive,omitempty"`
 	// CanMoveItemWithinTeamDrive: Deprecated: Output only. Use
 	// `canMoveItemWithinDrive` instead.
@@ -1686,17 +1907,17 @@ type FileCapabilities struct {
 	CanReadLabels bool `json:"canReadLabels,omitempty"`
 	// CanReadRevisions: Output only. Whether the current user can read the
 	// revisions resource of this file. For a shared drive item, whether revisions
-	// of non-folder descendants of this item, or this item itself if it is not a
-	// folder, can be read.
+	// of non-folder descendants of this item, or this item if it's not a folder,
+	// can be read.
 	CanReadRevisions bool `json:"canReadRevisions,omitempty"`
 	// CanReadTeamDrive: Deprecated: Output only. Use `canReadDrive` instead.
 	CanReadTeamDrive bool `json:"canReadTeamDrive,omitempty"`
 	// CanRemoveChildren: Output only. Whether the current user can remove children
-	// from this folder. This is always false when the item is not a folder. For a
+	// from this folder. This is always `false` when the item isn't a folder. For a
 	// folder in a shared drive, use `canDeleteChildren` or `canTrashChildren`
 	// instead.
 	CanRemoveChildren bool `json:"canRemoveChildren,omitempty"`
-	// CanRemoveContentRestriction: Output only. Whether there is a content
+	// CanRemoveContentRestriction: Output only. Whether there's a content
 	// restriction on the file that can be removed by the current user.
 	CanRemoveContentRestriction bool `json:"canRemoveContentRestriction,omitempty"`
 	// CanRemoveMyDriveParent: Output only. Whether the current user can remove a
@@ -1711,7 +1932,7 @@ type FileCapabilities struct {
 	// CanTrash: Output only. Whether the current user can move this file to trash.
 	CanTrash bool `json:"canTrash,omitempty"`
 	// CanTrashChildren: Output only. Whether the current user can trash children
-	// of this folder. This is false when the item is not a folder. Only populated
+	// of this folder. This is `false` when the item isn't a folder. Only populated
 	// for items in shared drives.
 	CanTrashChildren bool `json:"canTrashChildren,omitempty"`
 	// CanUntrash: Output only. Whether the current user can restore this file from
@@ -1739,7 +1960,7 @@ func (s FileCapabilities) MarshalJSON() ([]byte, error) {
 // These fields are never populated in responses.
 type FileContentHints struct {
 	// IndexableText: Text to be indexed for the file to improve fullText queries.
-	// This is limited to 128KB in length and may contain HTML elements.
+	// This is limited to 128 KB in length and may contain HTML elements.
 	IndexableText string `json:"indexableText,omitempty"`
 	// Thumbnail: A thumbnail for the file. This will only be used if Google Drive
 	// cannot generate a standard thumbnail.
@@ -1765,7 +1986,8 @@ func (s FileContentHints) MarshalJSON() ([]byte, error) {
 // FileContentHintsThumbnail: A thumbnail for the file. This will only be used
 // if Google Drive cannot generate a standard thumbnail.
 type FileContentHintsThumbnail struct {
-	// Image: The thumbnail data encoded with URL-safe Base64 (RFC 4648 section 5).
+	// Image: The thumbnail data encoded with URL-safe Base64 (RFC 4648 section 5
+	// (https://datatracker.ietf.org/doc/html/rfc4648#section-5)).
 	Image string `json:"image,omitempty"`
 	// MimeType: The MIME type of the thumbnail.
 	MimeType string `json:"mimeType,omitempty"`
@@ -1983,7 +2205,7 @@ type FileShortcutDetails struct {
 	// points to. The value of this field is a snapshot of the target's MIME type,
 	// captured when the shortcut is created.
 	TargetMimeType string `json:"targetMimeType,omitempty"`
-	// TargetResourceKey: Output only. The ResourceKey for the target file.
+	// TargetResourceKey: Output only. The `resourceKey` for the target file.
 	TargetResourceKey string `json:"targetResourceKey,omitempty"`
 	// ForceSendFields is a list of field names (e.g. "TargetId") to
 	// unconditionally include in API requests. By default, fields with empty or
@@ -2032,15 +2254,15 @@ func (s FileVideoMediaMetadata) MarshalJSON() ([]byte, error) {
 
 // FileList: A list of files.
 type FileList struct {
-	// Files: The list of files. If nextPageToken is populated, then this list may
-	// be incomplete and an additional page of results should be fetched.
+	// Files: The list of files. If `nextPageToken` is populated, then this list
+	// may be incomplete and an additional page of results should be fetched.
 	Files []*File `json:"files,omitempty"`
 	// IncompleteSearch: Whether the search process was incomplete. If true, then
 	// some search results might be missing, since all documents were not searched.
-	// This can occur when searching multiple drives with the 'allDrives' corpora,
+	// This can occur when searching multiple drives with the `allDrives` corpora,
 	// but all corpora couldn't be searched. When this happens, it's suggested that
-	// clients narrow their query by choosing a different corpus such as 'user' or
-	// 'drive'.
+	// clients narrow their query by choosing a different corpus such as `user` or
+	// `drive`.
 	IncompleteSearch bool `json:"incompleteSearch,omitempty"`
 	// Kind: Identifies what kind of resource this is. Value: the fixed string
 	// "drive#fileList".
@@ -2070,6 +2292,42 @@ type FileList struct {
 
 func (s FileList) MarshalJSON() ([]byte, error) {
 	type NoMethod FileList
+	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
+}
+
+// GenerateCseTokenResponse: JWT and associated metadata used to generate CSE
+// files.
+type GenerateCseTokenResponse struct {
+	// CurrentKaclsId: The current Key ACL Service (KACLS) ID associated with the
+	// JWT.
+	CurrentKaclsId int64 `json:"currentKaclsId,omitempty,string"`
+	// CurrentKaclsName: Name of the KACLs that the returned KACLs ID points to.
+	CurrentKaclsName string `json:"currentKaclsName,omitempty"`
+	// FileId: The fileId for which the JWT was generated.
+	FileId string `json:"fileId,omitempty"`
+	// Jwt: The signed JSON Web Token (JWT) for the file.
+	Jwt string `json:"jwt,omitempty"`
+	// Kind: Output only. Identifies what kind of resource this is. Value: the
+	// fixed string "drive#generateCseTokenResponse".
+	Kind string `json:"kind,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the server.
+	googleapi.ServerResponse `json:"-"`
+	// ForceSendFields is a list of field names (e.g. "CurrentKaclsId") to
+	// unconditionally include in API requests. By default, fields with empty or
+	// default values are omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-ForceSendFields for more
+	// details.
+	ForceSendFields []string `json:"-"`
+	// NullFields is a list of field names (e.g. "CurrentKaclsId") to include in
+	// API requests with the JSON null value. By default, fields with empty values
+	// are omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-NullFields for more details.
+	NullFields []string `json:"-"`
+}
+
+func (s GenerateCseTokenResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod GenerateCseTokenResponse
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
@@ -2175,7 +2433,7 @@ func (s LabelField) MarshalJSON() ([]byte, error) {
 type LabelFieldModification struct {
 	// FieldId: The ID of the field to be modified.
 	FieldId string `json:"fieldId,omitempty"`
-	// Kind: This is always drive#labelFieldModification.
+	// Kind: This is always "drive#labelFieldModification".
 	Kind string `json:"kind,omitempty"`
 	// SetDateValues: Replaces the value of a dateString Field with these new
 	// values. The string must be in the RFC 3339 full-date format: YYYY-MM-DD.
@@ -2188,7 +2446,7 @@ type LabelFieldModification struct {
 	// SetTextValues: Sets the value of a `text` field.
 	SetTextValues []string `json:"setTextValues,omitempty"`
 	// SetUserValues: Replaces a `user` field with these new values. The values
-	// must be valid email addresses.
+	// must be a valid email addresses.
 	SetUserValues []string `json:"setUserValues,omitempty"`
 	// UnsetValues: Unsets the values for this field.
 	UnsetValues bool `json:"unsetValues,omitempty"`
@@ -2212,7 +2470,7 @@ func (s LabelFieldModification) MarshalJSON() ([]byte, error) {
 
 // LabelList: A list of labels applied to a file.
 type LabelList struct {
-	// Kind: This is always drive#labelList
+	// Kind: This is always "drive#labelList".
 	Kind string `json:"kind,omitempty"`
 	// Labels: The list of labels.
 	Labels []*Label `json:"labels,omitempty"`
@@ -2244,13 +2502,13 @@ func (s LabelList) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
-// LabelModification: A modification to a label on a file. A LabelModification
-// can be used to apply a label to a file, update an existing label on a file,
-// or remove a label from a file.
+// LabelModification: A modification to a label on a file. A
+// `LabelModification` can be used to apply a label to a file, update an
+// existing label on a file, or remove a label from a file.
 type LabelModification struct {
 	// FieldModifications: The list of modifications to this label's fields.
 	FieldModifications []*LabelFieldModification `json:"fieldModifications,omitempty"`
-	// Kind: This is always drive#labelModification.
+	// Kind: This is always "drive#labelModification".
 	Kind string `json:"kind,omitempty"`
 	// LabelId: The ID of the label to modify.
 	LabelId string `json:"labelId,omitempty"`
@@ -2274,11 +2532,11 @@ func (s LabelModification) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
-// ListAccessProposalsResponse: The response to an Access Proposal list
+// ListAccessProposalsResponse: The response to an access proposal list
 // request.
 type ListAccessProposalsResponse struct {
-	// AccessProposals: The list of Access Proposals. This field is only populated
-	// in v3 and v3beta.
+	// AccessProposals: The list of access proposals. This field is only populated
+	// in Drive API v3.
 	AccessProposals []*AccessProposal `json:"accessProposals,omitempty"`
 	// NextPageToken: The continuation token for the next page of results. This
 	// will be absent if the end of the results list has been reached. If the token
@@ -2306,39 +2564,11 @@ func (s ListAccessProposalsResponse) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
-// ListOperationsResponse: The response message for Operations.ListOperations.
-type ListOperationsResponse struct {
-	// NextPageToken: The standard List next-page token.
-	NextPageToken string `json:"nextPageToken,omitempty"`
-	// Operations: A list of operations that matches the specified filter in the
-	// request.
-	Operations []*Operation `json:"operations,omitempty"`
-
-	// ServerResponse contains the HTTP response code and headers from the server.
-	googleapi.ServerResponse `json:"-"`
-	// ForceSendFields is a list of field names (e.g. "NextPageToken") to
-	// unconditionally include in API requests. By default, fields with empty or
-	// default values are omitted from API requests. See
-	// https://pkg.go.dev/google.golang.org/api#hdr-ForceSendFields for more
-	// details.
-	ForceSendFields []string `json:"-"`
-	// NullFields is a list of field names (e.g. "NextPageToken") to include in API
-	// requests with the JSON null value. By default, fields with empty values are
-	// omitted from API requests. See
-	// https://pkg.go.dev/google.golang.org/api#hdr-NullFields for more details.
-	NullFields []string `json:"-"`
-}
-
-func (s ListOperationsResponse) MarshalJSON() ([]byte, error) {
-	type NoMethod ListOperationsResponse
-	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
-}
-
 // ModifyLabelsRequest: A request to modify the set of labels on a file. This
 // request may contain many modifications that will either all succeed or all
 // fail atomically.
 type ModifyLabelsRequest struct {
-	// Kind: This is always drive#modifyLabelsRequest.
+	// Kind: This is always "drive#modifyLabelsRequest".
 	Kind string `json:"kind,omitempty"`
 	// LabelModifications: The list of modifications to apply to the labels on the
 	// file.
@@ -2361,10 +2591,10 @@ func (s ModifyLabelsRequest) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
-// ModifyLabelsResponse: Response to a ModifyLabels request. This contains only
-// those labels which were added or updated by the request.
+// ModifyLabelsResponse: Response to a `ModifyLabels` request. This contains
+// only those labels which were added or updated by the request.
 type ModifyLabelsResponse struct {
-	// Kind: This is always drive#modifyLabelsResponse
+	// Kind: This is always "drive#modifyLabelsResponse".
 	Kind string `json:"kind,omitempty"`
 	// ModifiedLabels: The list of labels which were added or updated by the
 	// request.
@@ -2438,10 +2668,13 @@ func (s Operation) MarshalJSON() ([]byte, error) {
 }
 
 // Permission: A permission for a file. A permission grants a user, group,
-// domain, or the world access to a file or a folder hierarchy. By default,
-// permissions requests only return a subset of fields. Permission kind, ID,
-// type, and role are always returned. To retrieve specific fields, see
-// https://developers.google.com/workspace/drive/api/guides/fields-parameter.
+// domain, or the world access to a file or a folder hierarchy. For more
+// information, see Share files, folders, and drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-sharing).
+// By default, permission requests only return a subset of fields. Permission
+// `kind`, `ID`, `type`, and `role` are always returned. To retrieve specific
+// fields, see Return specific fields
+// (https://developers.google.com/workspace/drive/api/guides/fields-parameter).
 // Some resource methods (such as `permissions.update`) require a
 // `permissionId`. Use the `permissions.list` method to retrieve the ID for a
 // file, folder, or shared drive.
@@ -2451,13 +2684,14 @@ type Permission struct {
 	// `anyone`.
 	AllowFileDiscovery bool `json:"allowFileDiscovery,omitempty"`
 	// Deleted: Output only. Whether the account associated with this permission
-	// has been deleted. This field only pertains to user and group permissions.
+	// has been deleted. This field only pertains to permissions of type `user` or
+	// `group`.
 	Deleted bool `json:"deleted,omitempty"`
 	// DisplayName: Output only. The "pretty" name of the value of the permission.
 	// The following is a list of examples for each type of permission: * `user` -
-	// User's full name, as defined for their Google account, such as "Joe Smith."
-	// * `group` - Name of the Google Group, such as "The Company Administrators."
-	// * `domain` - String domain name, such as "thecompany.com." * `anyone` - No
+	// User's full name, as defined for their Google Account, such as "Dana A." *
+	// `group` - Name of the Google Group, such as "The Company Administrators." *
+	// `domain` - String domain name, such as "cymbalgroup.com." * `anyone` - No
 	// `displayName` is present.
 	DisplayName string `json:"displayName,omitempty"`
 	// Domain: The domain to which this permission refers.
@@ -2471,43 +2705,47 @@ type Permission struct {
 	// The time cannot be more than a year in the future
 	ExpirationTime string `json:"expirationTime,omitempty"`
 	// Id: Output only. The ID of this permission. This is a unique identifier for
-	// the grantee, and is published in User resources as `permissionId`. IDs
-	// should be treated as opaque values.
+	// the grantee, and is published in the User resource
+	// (https://developers.google.com/workspace/drive/api/reference/rest/v3/User)
+	// as `permissionId`. IDs should be treated as opaque values.
 	Id string `json:"id,omitempty"`
-	// InheritedPermissionsDisabled: When true, only organizers, owners, and users
-	// with permissions added directly on the item can access it.
+	// InheritedPermissionsDisabled: When `true`, only organizers, owners, and
+	// users with permissions added directly on the item can access it.
 	InheritedPermissionsDisabled bool `json:"inheritedPermissionsDisabled,omitempty"`
 	// Kind: Output only. Identifies what kind of resource this is. Value: the
 	// fixed string "drive#permission".
 	Kind string `json:"kind,omitempty"`
 	// PendingOwner: Whether the account associated with this permission is a
-	// pending owner. Only populated for `user` type permissions for files that are
-	// not in a shared drive.
+	// pending owner. Only populated for permissions of type `user` for files that
+	// aren't in a shared drive.
 	PendingOwner bool `json:"pendingOwner,omitempty"`
 	// PermissionDetails: Output only. Details of whether the permissions on this
-	// item are inherited or directly on this item.
+	// item are inherited or are directly on this item.
 	PermissionDetails []*PermissionPermissionDetails `json:"permissionDetails,omitempty"`
 	// PhotoLink: Output only. A link to the user's profile photo, if available.
 	PhotoLink string `json:"photoLink,omitempty"`
-	// Role: The role granted by this permission. While new values may be supported
-	// in the future, the following are currently allowed: * `owner` * `organizer`
-	// * `fileOrganizer` * `writer` * `commenter` * `reader`
+	// Role: The role granted by this permission. Supported values include: *
+	// `owner` * `organizer` * `fileOrganizer` * `writer` * `commenter` * `reader`
+	// For more information, see Roles and permissions
+	// (https://developers.google.com/workspace/drive/api/guides/ref-roles).
 	Role string `json:"role,omitempty"`
 	// TeamDrivePermissionDetails: Output only. Deprecated: Output only. Use
 	// `permissionDetails` instead.
 	TeamDrivePermissionDetails []*PermissionTeamDrivePermissionDetails `json:"teamDrivePermissionDetails,omitempty"`
-	// Type: The type of the grantee. Valid values are: * `user` * `group` *
-	// `domain` * `anyone` When creating a permission, if `type` is `user` or
-	// `group`, you must provide an `emailAddress` for the user or group. When
-	// `type` is `domain`, you must provide a `domain`. There isn't extra
-	// information required for an `anyone` type.
+	// Type: The type of the grantee. Supported values include: * `user` * `group`
+	// * `domain` * `anyone` When creating a permission, if `type` is `user` or
+	// `group`, you must provide an `emailAddress` for the user or group. If `type`
+	// is `domain`, you must provide a `domain`. If `type` is `anyone`, no extra
+	// information is required.
 	Type string `json:"type,omitempty"`
 	// View: Indicates the view for this permission. Only populated for permissions
-	// that belong to a view. published and metadata are the only supported values.
-	// - published: The permission's role is published_reader. - metadata: The item
-	// is only visible to the metadata view because the item has limited access and
-	// the scope has at least read access to the parent. Note: The metadata view is
-	// currently only supported on folders.
+	// that belong to a view. The only supported values are `published` and
+	// `metadata`: * `published`: The permission's role is `publishedReader`. *
+	// `metadata`: The item is only visible to the `metadata` view because the item
+	// has limited access and the scope has at least read access to the parent. The
+	// `metadata` view is only supported on folders. For more information, see
+	// Views
+	// (https://developers.google.com/workspace/drive/api/guides/ref-roles#views).
 	View string `json:"view,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the server.
@@ -2537,13 +2775,13 @@ type PermissionPermissionDetails struct {
 	// InheritedFrom: Output only. The ID of the item from which this permission is
 	// inherited. This is only populated for items in shared drives.
 	InheritedFrom string `json:"inheritedFrom,omitempty"`
-	// PermissionType: Output only. The permission type for this user. While new
-	// values may be added in future, the following are currently possible: *
-	// `file` * `member`
+	// PermissionType: Output only. The permission type for this user. Supported
+	// values include: * `file` * `member`
 	PermissionType string `json:"permissionType,omitempty"`
-	// Role: Output only. The primary role for this user. While new values may be
-	// added in the future, the following are currently possible: * `owner` *
-	// `organizer` * `fileOrganizer` * `writer` * `commenter` * `reader`
+	// Role: Output only. The primary role for this user. Supported values include:
+	// * `owner` * `organizer` * `fileOrganizer` * `writer` * `commenter` *
+	// `reader` For more information, see Roles and permissions
+	// (https://developers.google.com/workspace/drive/api/guides/ref-roles).
 	Role string `json:"role,omitempty"`
 	// ForceSendFields is a list of field names (e.g. "Inherited") to
 	// unconditionally include in API requests. By default, fields with empty or
@@ -2605,7 +2843,7 @@ type PermissionList struct {
 	// typically valid for several hours. However, if new items are added or
 	// removed, your expected results might differ.
 	NextPageToken string `json:"nextPageToken,omitempty"`
-	// Permissions: The list of permissions. If nextPageToken is populated, then
+	// Permissions: The list of permissions. If `nextPageToken` is populated, then
 	// this list may be incomplete and an additional page of results should be
 	// fetched.
 	Permissions []*Permission `json:"permissions,omitempty"`
@@ -2634,15 +2872,18 @@ func (s PermissionList) MarshalJSON() ([]byte, error) {
 // `replies.update`) require a `replyId`. Use the `replies.list` method to
 // retrieve the ID for a reply.
 type Reply struct {
-	// Action: The action the reply performed to the parent comment. Valid values
-	// are: * `resolve` * `reopen`
+	// Action: The action the reply performed to the parent comment. The supported
+	// values are: * `resolve` * `reopen`
 	Action string `json:"action,omitempty"`
+	// AssigneeEmailAddress: Output only. The email address of the user assigned to
+	// this comment. If no user is assigned, the field is unset.
+	AssigneeEmailAddress string `json:"assigneeEmailAddress,omitempty"`
 	// Author: Output only. The author of the reply. The author's email address and
-	// permission ID will not be populated.
+	// permission ID won't be populated.
 	Author *User `json:"author,omitempty"`
 	// Content: The plain text content of the reply. This field is used for setting
-	// the content, while `htmlContent` should be displayed. This is required on
-	// creates if no `action` is specified.
+	// the content, while `htmlContent` should be displayed. This field is required
+	// by the `create` method if no `action` value is specified.
 	Content string `json:"content,omitempty"`
 	// CreatedTime: The time at which the reply was created (RFC 3339 date-time).
 	CreatedTime string `json:"createdTime,omitempty"`
@@ -2656,6 +2897,9 @@ type Reply struct {
 	// Kind: Output only. Identifies what kind of resource this is. Value: the
 	// fixed string "drive#reply".
 	Kind string `json:"kind,omitempty"`
+	// MentionedEmailAddresses: Output only. A list of email addresses for users
+	// mentioned in this comment. If no users are mentioned, the list is empty.
+	MentionedEmailAddresses []string `json:"mentionedEmailAddresses,omitempty"`
 	// ModifiedTime: The last time the reply was modified (RFC 3339 date-time).
 	ModifiedTime string `json:"modifiedTime,omitempty"`
 
@@ -2691,8 +2935,8 @@ type ReplyList struct {
 	// for several hours. However, if new items are added or removed, your expected
 	// results might differ.
 	NextPageToken string `json:"nextPageToken,omitempty"`
-	// Replies: The list of replies. If nextPageToken is populated, then this list
-	// may be incomplete and an additional page of results should be fetched.
+	// Replies: The list of replies. If `nextPageToken` is populated, then this
+	// list may be incomplete and an additional page of results should be fetched.
 	Replies []*Reply `json:"replies,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the server.
@@ -2718,23 +2962,25 @@ func (s ReplyList) MarshalJSON() ([]byte, error) {
 // ResolveAccessProposalRequest: Request message for resolving an
 // AccessProposal on a file.
 type ResolveAccessProposalRequest struct {
-	// Action: Required. The action to take on the AccessProposal.
+	// Action: Required. The action to take on the access proposal.
 	//
 	// Possible values:
 	//   "ACTION_UNSPECIFIED" - Unspecified action
-	//   "ACCEPT" - The user accepts the proposal. Note: If this action is used,
-	// the `role` field must have at least one value.
-	//   "DENY" - The user denies the proposal
+	//   "ACCEPT" - The user accepts the access proposal. Note: If this action is
+	// used, the `role` field must have at least one value.
+	//   "DENY" - The user denies the access proposal.
 	Action string `json:"action,omitempty"`
-	// Role: Optional. The roles the approver has allowed, if any. Note: This field
-	// is required for the `ACCEPT` action.
+	// Role: Optional. The roles that the approver has allowed, if any. For more
+	// information, see Roles and permissions
+	// (https://developers.google.com/workspace/drive/api/guides/ref-roles). Note:
+	// This field is required for the `ACCEPT` action.
 	Role []string `json:"role,omitempty"`
 	// SendNotification: Optional. Whether to send an email to the requester when
-	// the AccessProposal is denied or accepted.
+	// the access proposal is denied or accepted.
 	SendNotification bool `json:"sendNotification,omitempty"`
 	// View: Optional. Indicates the view for this access proposal. This should
-	// only be set when the proposal belongs to a view. `published` is the only
-	// supported value.
+	// only be set when the proposal belongs to a view. Only `published` is
+	// supported.
 	View string `json:"view,omitempty"`
 	// ForceSendFields is a list of field names (e.g. "Action") to unconditionally
 	// include in API requests. By default, fields with empty or default values are
@@ -2751,6 +2997,38 @@ type ResolveAccessProposalRequest struct {
 
 func (s ResolveAccessProposalRequest) MarshalJSON() ([]byte, error) {
 	type NoMethod ResolveAccessProposalRequest
+	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
+}
+
+// ReviewerResponse: A response on an Approval made by a specific Reviewer.
+type ReviewerResponse struct {
+	// Kind: This is always drive#reviewerResponse.
+	Kind string `json:"kind,omitempty"`
+	// Response: A Reviewer’s Response for the Approval.
+	//
+	// Possible values:
+	//   "RESPONSE_UNSPECIFIED" - Response was set to an unrecognized value.
+	//   "NO_RESPONSE" - The reviewer has not yet responded
+	//   "APPROVED" - The Reviewer has approved the item.
+	//   "DECLINED" - The Reviewer has declined the item.
+	Response string `json:"response,omitempty"`
+	// Reviewer: The user that is responsible for this response.
+	Reviewer *User `json:"reviewer,omitempty"`
+	// ForceSendFields is a list of field names (e.g. "Kind") to unconditionally
+	// include in API requests. By default, fields with empty or default values are
+	// omitted from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-ForceSendFields for more
+	// details.
+	ForceSendFields []string `json:"-"`
+	// NullFields is a list of field names (e.g. "Kind") to include in API requests
+	// with the JSON null value. By default, fields with empty values are omitted
+	// from API requests. See
+	// https://pkg.go.dev/google.golang.org/api#hdr-NullFields for more details.
+	NullFields []string `json:"-"`
+}
+
+func (s ReviewerResponse) MarshalJSON() ([]byte, error) {
+	type NoMethod ReviewerResponse
 	return gensupport.MarshalJSON(NoMethod(s), s.ForceSendFields, s.NullFields)
 }
 
@@ -3056,6 +3334,9 @@ type TeamDriveCapabilities struct {
 	// CanChangeDomainUsersOnlyRestriction: Whether the current user can change the
 	// `domainUsersOnly` restriction of this Team Drive.
 	CanChangeDomainUsersOnlyRestriction bool `json:"canChangeDomainUsersOnlyRestriction,omitempty"`
+	// CanChangeDownloadRestriction: Whether the current user can change
+	// organizer-applied download restrictions of this shared drive.
+	CanChangeDownloadRestriction bool `json:"canChangeDownloadRestriction,omitempty"`
 	// CanChangeSharingFoldersRequiresOrganizerPermissionRestriction: Whether the
 	// current user can change the `sharingFoldersRequiresOrganizerPermission`
 	// restriction of this Team Drive.
@@ -3358,10 +3639,12 @@ type AccessproposalsGetCall struct {
 	header_      http.Header
 }
 
-// Get: Retrieves an AccessProposal by ID.
+// Get: Retrieves an access proposal by ID. For more information, see Manage
+// pending access proposals
+// (https://developers.google.com/workspace/drive/api/guides/pending-access).
 //
-// - fileId: The id of the item the request is on.
-// - proposalId: The id of the access proposal to resolve.
+// - fileId: The ID of the item the request is on.
+// - proposalId: The ID of the access proposal to resolve.
 func (r *AccessproposalsService) Get(fileId string, proposalId string) *AccessproposalsGetCall {
 	c := &AccessproposalsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.fileId = fileId
@@ -3470,11 +3753,13 @@ type AccessproposalsListCall struct {
 	header_      http.Header
 }
 
-// List: List the AccessProposals on a file. Note: Only approvers are able to
-// list AccessProposals on a file. If the user is not an approver, returns a
-// 403.
+// List: List the access proposals on a file. For more information, see Manage
+// pending access proposals
+// (https://developers.google.com/workspace/drive/api/guides/pending-access).
+// Note: Only approvers are able to list access proposals on a file. If the
+// user isn't an approver, a 403 error is returned.
 //
-// - fileId: The id of the item the request is on.
+// - fileId: The ID of the item the request is on.
 func (r *AccessproposalsService) List(fileId string) *AccessproposalsListCall {
 	c := &AccessproposalsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.fileId = fileId
@@ -3482,7 +3767,7 @@ func (r *AccessproposalsService) List(fileId string) *AccessproposalsListCall {
 }
 
 // PageSize sets the optional parameter "pageSize": The number of results per
-// page
+// page.
 func (c *AccessproposalsListCall) PageSize(pageSize int64) *AccessproposalsListCall {
 	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
 	return c
@@ -3618,10 +3903,12 @@ type AccessproposalsResolveCall struct {
 	header_                      http.Header
 }
 
-// Resolve: Used to approve or deny an Access Proposal.
+// Resolve: Approves or denies an access proposal. For more information, see
+// Manage pending access proposals
+// (https://developers.google.com/workspace/drive/api/guides/pending-access).
 //
-// - fileId: The id of the item the request is on.
-// - proposalId: The id of the access proposal to resolve.
+// - fileId: The ID of the item the request is on.
+// - proposalId: The ID of the access proposal to resolve.
 func (r *AccessproposalsService) Resolve(fileId string, proposalId string, resolveaccessproposalrequest *ResolveAccessProposalRequest) *AccessproposalsResolveCall {
 	c := &AccessproposalsResolveCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.fileId = fileId
@@ -3689,6 +3976,264 @@ func (c *AccessproposalsResolveCall) Do(opts ...googleapi.CallOption) error {
 	}
 	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "drive.accessproposals.resolve", "response", internallog.HTTPResponse(res, nil))
 	return nil
+}
+
+type ApprovalsGetCall struct {
+	s            *Service
+	fileId       string
+	approvalId   string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// Get: Gets an Approval by ID.
+//
+// - approvalId: The ID of the Approval.
+// - fileId: The ID of the file the Approval is on.
+func (r *ApprovalsService) Get(fileId string, approvalId string) *ApprovalsGetCall {
+	c := &ApprovalsGetCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.fileId = fileId
+	c.approvalId = approvalId
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse for more
+// details.
+func (c *ApprovalsGetCall) Fields(s ...googleapi.Field) *ApprovalsGetCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets an optional parameter which makes the operation fail if the
+// object's ETag matches the given value. This is useful for getting updates
+// only after the object has changed since the last request.
+func (c *ApprovalsGetCall) IfNoneMatch(entityTag string) *ApprovalsGetCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method.
+func (c *ApprovalsGetCall) Context(ctx context.Context) *ApprovalsGetCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns a http.Header that can be modified by the caller to add
+// headers to the request.
+func (c *ApprovalsGetCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ApprovalsGetCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := gensupport.SetHeaders(c.s.userAgent(), "", c.header_)
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "files/{fileId}/approvals/{approvalId}")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("GET", urls, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"fileId":     c.fileId,
+		"approvalId": c.approvalId,
+	})
+	c.s.logger.DebugContext(c.ctx_, "api request", "serviceName", apiName, "rpcName", "drive.approvals.get", "request", internallog.HTTPRequest(req, nil))
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "drive.approvals.get" call.
+// Any non-2xx status code is an error. Response headers are in either
+// *Approval.ServerResponse.Header or (if a response was returned at all) in
+// error.(*googleapi.Error).Header. Use googleapi.IsNotModified to check
+// whether the returned error was because http.StatusNotModified was returned.
+func (c *ApprovalsGetCall) Do(opts ...googleapi.CallOption) (*Approval, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, gensupport.WrapError(&googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, gensupport.WrapError(err)
+	}
+	ret := &Approval{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	b, err := gensupport.DecodeResponseBytes(target, res)
+	if err != nil {
+		return nil, err
+	}
+	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "drive.approvals.get", "response", internallog.HTTPResponse(res, b))
+	return ret, nil
+}
+
+type ApprovalsListCall struct {
+	s            *Service
+	fileId       string
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// List: Lists the Approvals on a file.
+//
+// - fileId: The ID of the file the Approval is on.
+func (r *ApprovalsService) List(fileId string) *ApprovalsListCall {
+	c := &ApprovalsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	c.fileId = fileId
+	return c
+}
+
+// PageSize sets the optional parameter "pageSize": The maximum number of
+// Approvals to return. When not set, at most 100 Approvals will be returned.
+func (c *ApprovalsListCall) PageSize(pageSize int64) *ApprovalsListCall {
+	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
+	return c
+}
+
+// PageToken sets the optional parameter "pageToken": The token for continuing
+// a previous list request on the next page. This should be set to the value of
+// nextPageToken from a previous response.
+func (c *ApprovalsListCall) PageToken(pageToken string) *ApprovalsListCall {
+	c.urlParams_.Set("pageToken", pageToken)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse for more
+// details.
+func (c *ApprovalsListCall) Fields(s ...googleapi.Field) *ApprovalsListCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets an optional parameter which makes the operation fail if the
+// object's ETag matches the given value. This is useful for getting updates
+// only after the object has changed since the last request.
+func (c *ApprovalsListCall) IfNoneMatch(entityTag string) *ApprovalsListCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method.
+func (c *ApprovalsListCall) Context(ctx context.Context) *ApprovalsListCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns a http.Header that can be modified by the caller to add
+// headers to the request.
+func (c *ApprovalsListCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *ApprovalsListCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := gensupport.SetHeaders(c.s.userAgent(), "", c.header_)
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "files/{fileId}/approvals")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("GET", urls, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	googleapi.Expand(req.URL, map[string]string{
+		"fileId": c.fileId,
+	})
+	c.s.logger.DebugContext(c.ctx_, "api request", "serviceName", apiName, "rpcName", "drive.approvals.list", "request", internallog.HTTPRequest(req, nil))
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "drive.approvals.list" call.
+// Any non-2xx status code is an error. Response headers are in either
+// *ApprovalList.ServerResponse.Header or (if a response was returned at all)
+// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to check
+// whether the returned error was because http.StatusNotModified was returned.
+func (c *ApprovalsListCall) Do(opts ...googleapi.CallOption) (*ApprovalList, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, gensupport.WrapError(&googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, gensupport.WrapError(err)
+	}
+	ret := &ApprovalList{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	b, err := gensupport.DecodeResponseBytes(target, res)
+	if err != nil {
+		return nil, err
+	}
+	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "drive.approvals.list", "response", internallog.HTTPResponse(res, b))
+	return ret, nil
+}
+
+// Pages invokes f for each page of results.
+// A non-nil error returned from f will halt the iteration.
+// The provided context supersedes any context provided to the Context method.
+func (c *ApprovalsListCall) Pages(ctx context.Context, f func(*ApprovalList) error) error {
+	c.ctx_ = ctx
+	defer c.PageToken(c.urlParams_.Get("pageToken"))
+	for {
+		x, err := c.Do()
+		if err != nil {
+			return err
+		}
+		if err := f(x); err != nil {
+			return err
+		}
+		if x.NextPageToken == "" {
+			return nil
+		}
+		c.PageToken(x.NextPageToken)
+	}
 }
 
 type AppsGetCall struct {
@@ -5152,7 +5697,9 @@ type DrivesCreateCall struct {
 	header_    http.Header
 }
 
-// Create: Creates a shared drive.
+// Create: Creates a shared drive. For more information, see Manage shared
+// drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives).
 //
 //   - requestId: An ID, such as a random UUID, which uniquely identifies this
 //     user's request for idempotent creation of a shared drive. A repeated
@@ -5256,7 +5803,9 @@ type DrivesDeleteCall struct {
 }
 
 // Delete: Permanently deletes a shared drive for which the user is an
-// `organizer`. The shared drive cannot contain any untrashed items.
+// `organizer`. The shared drive cannot contain any untrashed items. For more
+// information, see Manage shared drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives).
 //
 // - driveId: The ID of the shared drive.
 func (r *DrivesService) Delete(driveId string) *DrivesDeleteCall {
@@ -5347,7 +5896,9 @@ type DrivesGetCall struct {
 	header_      http.Header
 }
 
-// Get: Gets a shared drive's metadata by ID.
+// Get: Gets a shared drive's metadata by ID. For more information, see Manage
+// shared drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives).
 //
 // - driveId: The ID of the shared drive.
 func (r *DrivesService) Get(driveId string) *DrivesGetCall {
@@ -5464,7 +6015,9 @@ type DrivesHideCall struct {
 	header_    http.Header
 }
 
-// Hide: Hides a shared drive from the default view.
+// Hide: Hides a shared drive from the default view. For more information, see
+// Manage shared drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives).
 //
 // - driveId: The ID of the shared drive.
 func (r *DrivesService) Hide(driveId string) *DrivesHideCall {
@@ -5564,7 +6117,8 @@ type DrivesListCall struct {
 // List:  Lists the user's shared drives. This method accepts the `q`
 // parameter, which is a search query combining one or more search terms. For
 // more information, see the Search for shared drives
-// (/workspace/drive/api/guides/search-shareddrives) guide.
+// (https://developers.google.com/workspace/drive/api/guides/search-shareddrives)
+// guide.
 func (r *DrivesService) List() *DrivesListCall {
 	c := &DrivesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	return c
@@ -5716,7 +6270,9 @@ type DrivesUnhideCall struct {
 	header_    http.Header
 }
 
-// Unhide: Restores a shared drive to the default view.
+// Unhide: Restores a shared drive to the default view. For more information,
+// see Manage shared drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives).
 //
 // - driveId: The ID of the shared drive.
 func (r *DrivesService) Unhide(driveId string) *DrivesUnhideCall {
@@ -5814,7 +6370,9 @@ type DrivesUpdateCall struct {
 	header_    http.Header
 }
 
-// Update: Updates the metadata for a shared drive.
+// Update: Updates the metadata for a shared drive. For more information, see
+// Manage shared drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives).
 //
 // - driveId: The ID of the shared drive.
 func (r *DrivesService) Update(driveId string, drive *Drive) *DrivesUpdateCall {
@@ -5927,7 +6485,8 @@ type FilesCopyCall struct {
 }
 
 // Copy: Creates a copy of a file and applies any requested updates with patch
-// semantics.
+// semantics. For more information, see Create and manage files
+// (https://developers.google.com/workspace/drive/api/guides/create-file).
 //
 // - fileId: The ID of the file.
 func (r *FilesService) Copy(fileId string, file *File) *FilesCopyCall {
@@ -5938,7 +6497,7 @@ func (r *FilesService) Copy(fileId string, file *File) *FilesCopyCall {
 }
 
 // EnforceSingleParent sets the optional parameter "enforceSingleParent":
-// Deprecated. Copying files into multiple folders is no longer supported. Use
+// Deprecated: Copying files into multiple folders is no longer supported. Use
 // shortcuts instead.
 func (c *FilesCopyCall) EnforceSingleParent(enforceSingleParent bool) *FilesCopyCall {
 	c.urlParams_.Set("enforceSingleParent", fmt.Sprint(enforceSingleParent))
@@ -5965,14 +6524,14 @@ func (c *FilesCopyCall) IncludeLabels(includeLabels string) *FilesCopyCall {
 
 // IncludePermissionsForView sets the optional parameter
 // "includePermissionsForView": Specifies which additional view's permissions
-// to include in the response. Only 'published' is supported.
+// to include in the response. Only `published` is supported.
 func (c *FilesCopyCall) IncludePermissionsForView(includePermissionsForView string) *FilesCopyCall {
 	c.urlParams_.Set("includePermissionsForView", includePermissionsForView)
 	return c
 }
 
 // KeepRevisionForever sets the optional parameter "keepRevisionForever":
-// Whether to set the 'keepForever' field in the new head revision. This is
+// Whether to set the `keepForever` field in the new head revision. This is
 // only applicable to files with binary content in Google Drive. Only 200
 // revisions for the file can be kept forever. If the limit is reached, try
 // deleting pinned revisions.
@@ -6095,22 +6654,26 @@ type FilesCreateCall struct {
 	header_    http.Header
 }
 
-// Create:  Creates a new file. This method supports an */upload* URI and
-// accepts uploaded media with the following characteristics: - *Maximum file
-// size:* 5,120 GB - *Accepted Media MIME types:*`*/*` Note: Specify a valid
-// MIME type, rather than the literal `*/*` value. The literal `*/*` is only
-// used to indicate that any valid MIME type can be uploaded. For more
-// information on uploading files, see Upload file data
-// (/workspace/drive/api/guides/manage-uploads). Apps creating shortcuts with
-// `files.create` must specify the MIME type
+// Create:  Creates a file. For more information, see Create and manage files
+// (https://developers.google.com/workspace/drive/api/guides/create-file). This
+// method supports an */upload* URI and accepts uploaded media with the
+// following characteristics: - *Maximum file size:* 5,120 GB - *Accepted Media
+// MIME types:* `*/*` (Specify a valid MIME type, rather than the literal `*/*`
+// value. The literal `*/*` is only used to indicate that any valid MIME type
+// can be uploaded. For more information, see Google Workspace and Google Drive
+// supported MIME types
+// (https://developers.google.com/workspace/drive/api/guides/mime-types).) For
+// more information on uploading files, see Upload file data
+// (https://developers.google.com/workspace/drive/api/guides/manage-uploads).
+// Apps creating shortcuts with the `create` method must specify the MIME type
 // `application/vnd.google-apps.shortcut`. Apps should specify a file extension
 // in the `name` property when inserting files with the API. For example, an
 // operation to insert a JPEG file should specify something like "name":
 // "cat.jpg" in the metadata. Subsequent `GET` requests include the read-only
 // `fileExtension` property populated with the extension originally specified
-// in the `title` property. When a Google Drive user requests to download a
+// in the `name` property. When a Google Drive user requests to download a
 // file, or when the file is downloaded through the sync client, Drive builds a
-// full filename (with extension) based on the title. In cases where the
+// full filename (with extension) based on the name. In cases where the
 // extension is missing, Drive attempts to determine the extension based on the
 // file's MIME type.
 func (r *FilesService) Create(file *File) *FilesCreateCall {
@@ -6120,7 +6683,7 @@ func (r *FilesService) Create(file *File) *FilesCreateCall {
 }
 
 // EnforceSingleParent sets the optional parameter "enforceSingleParent":
-// Deprecated. Creating files in multiple folders is no longer supported.
+// Deprecated: Creating files in multiple folders is no longer supported.
 func (c *FilesCreateCall) EnforceSingleParent(enforceSingleParent bool) *FilesCreateCall {
 	c.urlParams_.Set("enforceSingleParent", fmt.Sprint(enforceSingleParent))
 	return c
@@ -6146,14 +6709,14 @@ func (c *FilesCreateCall) IncludeLabels(includeLabels string) *FilesCreateCall {
 
 // IncludePermissionsForView sets the optional parameter
 // "includePermissionsForView": Specifies which additional view's permissions
-// to include in the response. Only 'published' is supported.
+// to include in the response. Only `published` is supported.
 func (c *FilesCreateCall) IncludePermissionsForView(includePermissionsForView string) *FilesCreateCall {
 	c.urlParams_.Set("includePermissionsForView", includePermissionsForView)
 	return c
 }
 
 // KeepRevisionForever sets the optional parameter "keepRevisionForever":
-// Whether to set the 'keepForever' field in the new head revision. This is
+// Whether to set the `keepForever` field in the new head revision. This is
 // only applicable to files with binary content in Google Drive. Only 200
 // revisions for the file can be kept forever. If the limit is reached, try
 // deleting pinned revisions.
@@ -6343,9 +6906,11 @@ type FilesDeleteCall struct {
 }
 
 // Delete: Permanently deletes a file owned by the user without moving it to
-// the trash. If the file belongs to a shared drive, the user must be an
-// `organizer` on the parent folder. If the target is a folder, all descendants
-// owned by the user are also deleted.
+// the trash. For more information, see Trash or delete files and folders
+// (https://developers.google.com/workspace/drive/api/guides/delete). If the
+// file belongs to a shared drive, the user must be an `organizer` on the
+// parent folder. If the target is a folder, all descendants owned by the user
+// are also deleted.
 //
 // - fileId: The ID of the file.
 func (r *FilesService) Delete(fileId string) *FilesDeleteCall {
@@ -6355,9 +6920,9 @@ func (r *FilesService) Delete(fileId string) *FilesDeleteCall {
 }
 
 // EnforceSingleParent sets the optional parameter "enforceSingleParent":
-// Deprecated: If an item is not in a shared drive and its last parent is
-// deleted but the item itself is not, the item will be placed under its
-// owner's root.
+// Deprecated: If an item isn't in a shared drive and its last parent is
+// deleted but the item itself isn't, the item will be placed under its owner's
+// root.
 func (c *FilesDeleteCall) EnforceSingleParent(enforceSingleParent bool) *FilesDeleteCall {
 	c.urlParams_.Set("enforceSingleParent", fmt.Sprint(enforceSingleParent))
 	return c
@@ -6441,8 +7006,10 @@ type FilesDownloadCall struct {
 	header_    http.Header
 }
 
-// Download: Downloads content of a file. Operations are valid for 24 hours
-// from the time of creation.
+// Download: Downloads the content of a file. For more information, see
+// Download and export files
+// (https://developers.google.com/workspace/drive/api/guides/manage-downloads).
+// Operations are valid for 24 hours from the time of creation.
 //
 // - fileId: The ID of the file to download.
 func (r *FilesService) Download(fileId string) *FilesDownloadCall {
@@ -6453,10 +7020,11 @@ func (r *FilesService) Download(fileId string) *FilesDownloadCall {
 
 // MimeType sets the optional parameter "mimeType": The MIME type the file
 // should be downloaded as. This field can only be set when downloading Google
-// Workspace documents. See Export MIME types for Google Workspace documents
-// (/drive/api/guides/ref-export-formats) for the list of supported MIME types.
-// If not set, a Google Workspace document is downloaded with a default MIME
-// type. The default MIME type might change in the future.
+// Workspace documents. For a list of supported MIME types, see Export MIME
+// types for Google Workspace documents
+// (/workspace/drive/api/guides/ref-export-formats). If not set, a Google
+// Workspace document is downloaded with a default MIME type. The default MIME
+// type might change in the future.
 func (c *FilesDownloadCall) MimeType(mimeType string) *FilesDownloadCall {
 	c.urlParams_.Set("mimeType", mimeType)
 	return c
@@ -6558,7 +7126,9 @@ type FilesEmptyTrashCall struct {
 	header_    http.Header
 }
 
-// EmptyTrash: Permanently deletes all of the user's trashed files.
+// EmptyTrash: Permanently deletes all of the user's trashed files. For more
+// information, see Trash or delete files and folders
+// (https://developers.google.com/workspace/drive/api/guides/delete).
 func (r *FilesService) EmptyTrash() *FilesEmptyTrashCall {
 	c := &FilesEmptyTrashCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	return c
@@ -6572,9 +7142,9 @@ func (c *FilesEmptyTrashCall) DriveId(driveId string) *FilesEmptyTrashCall {
 }
 
 // EnforceSingleParent sets the optional parameter "enforceSingleParent":
-// Deprecated: If an item is not in a shared drive and its last parent is
-// deleted but the item itself is not, the item will be placed under its
-// owner's root.
+// Deprecated: If an item isn't in a shared drive and its last parent is
+// deleted but the item itself isn't, the item will be placed under its owner's
+// root.
 func (c *FilesEmptyTrashCall) EnforceSingleParent(enforceSingleParent bool) *FilesEmptyTrashCall {
 	c.urlParams_.Set("enforceSingleParent", fmt.Sprint(enforceSingleParent))
 	return c
@@ -6643,11 +7213,15 @@ type FilesExportCall struct {
 }
 
 // Export: Exports a Google Workspace document to the requested MIME type and
-// returns exported byte content. Note that the exported content is limited to
-// 10MB.
+// returns exported byte content. For more information, see Download and export
+// files
+// (https://developers.google.com/workspace/drive/api/guides/manage-downloads).
+// Note that the exported content is limited to 10 MB.
 //
-// - fileId: The ID of the file.
-// - mimeType: The MIME type of the format requested for this export.
+//   - fileId: The ID of the file.
+//   - mimeType: The MIME type of the format requested for this export. For a
+//     list of supported MIME types, see Export MIME types for Google Workspace
+//     documents (/workspace/drive/api/guides/ref-export-formats).
 func (r *FilesService) Export(fileId string, mimeType string) *FilesExportCall {
 	c := &FilesExportCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.fileId = fileId
@@ -6738,6 +7312,127 @@ func (c *FilesExportCall) Do(opts ...googleapi.CallOption) error {
 	return nil
 }
 
+type FilesGenerateCseTokenCall struct {
+	s            *Service
+	urlParams_   gensupport.URLParams
+	ifNoneMatch_ string
+	ctx_         context.Context
+	header_      http.Header
+}
+
+// GenerateCseToken: Generates a CSE token which can be used to create or
+// update CSE files.
+func (r *FilesService) GenerateCseToken() *FilesGenerateCseTokenCall {
+	c := &FilesGenerateCseTokenCall{s: r.s, urlParams_: make(gensupport.URLParams)}
+	return c
+}
+
+// FileId sets the optional parameter "fileId": The ID of the file for which
+// the JWT should be generated. If not provided, an id will be generated.
+func (c *FilesGenerateCseTokenCall) FileId(fileId string) *FilesGenerateCseTokenCall {
+	c.urlParams_.Set("fileId", fileId)
+	return c
+}
+
+// Parent sets the optional parameter "parent": The ID of the expected parent
+// of the file. Used when generating a JWT for a new CSE file. If specified,
+// the parent will be fetched, and if the parent is a shared drive item, the
+// shared drive's policy will be used to determine the KACLS that should be
+// used. It is invalid to specify both file_id and parent in a single request.
+func (c *FilesGenerateCseTokenCall) Parent(parent string) *FilesGenerateCseTokenCall {
+	c.urlParams_.Set("parent", parent)
+	return c
+}
+
+// Fields allows partial responses to be retrieved. See
+// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse for more
+// details.
+func (c *FilesGenerateCseTokenCall) Fields(s ...googleapi.Field) *FilesGenerateCseTokenCall {
+	c.urlParams_.Set("fields", googleapi.CombineFields(s))
+	return c
+}
+
+// IfNoneMatch sets an optional parameter which makes the operation fail if the
+// object's ETag matches the given value. This is useful for getting updates
+// only after the object has changed since the last request.
+func (c *FilesGenerateCseTokenCall) IfNoneMatch(entityTag string) *FilesGenerateCseTokenCall {
+	c.ifNoneMatch_ = entityTag
+	return c
+}
+
+// Context sets the context to be used in this call's Do method.
+func (c *FilesGenerateCseTokenCall) Context(ctx context.Context) *FilesGenerateCseTokenCall {
+	c.ctx_ = ctx
+	return c
+}
+
+// Header returns a http.Header that can be modified by the caller to add
+// headers to the request.
+func (c *FilesGenerateCseTokenCall) Header() http.Header {
+	if c.header_ == nil {
+		c.header_ = make(http.Header)
+	}
+	return c.header_
+}
+
+func (c *FilesGenerateCseTokenCall) doRequest(alt string) (*http.Response, error) {
+	reqHeaders := gensupport.SetHeaders(c.s.userAgent(), "", c.header_)
+	if c.ifNoneMatch_ != "" {
+		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
+	}
+	c.urlParams_.Set("alt", alt)
+	c.urlParams_.Set("prettyPrint", "false")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "files/generateCseToken")
+	urls += "?" + c.urlParams_.Encode()
+	req, err := http.NewRequest("GET", urls, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = reqHeaders
+	c.s.logger.DebugContext(c.ctx_, "api request", "serviceName", apiName, "rpcName", "drive.files.generateCseToken", "request", internallog.HTTPRequest(req, nil))
+	return gensupport.SendRequest(c.ctx_, c.s.client, req)
+}
+
+// Do executes the "drive.files.generateCseToken" call.
+// Any non-2xx status code is an error. Response headers are in either
+// *GenerateCseTokenResponse.ServerResponse.Header or (if a response was
+// returned at all) in error.(*googleapi.Error).Header. Use
+// googleapi.IsNotModified to check whether the returned error was because
+// http.StatusNotModified was returned.
+func (c *FilesGenerateCseTokenCall) Do(opts ...googleapi.CallOption) (*GenerateCseTokenResponse, error) {
+	gensupport.SetOptions(c.urlParams_, opts...)
+	res, err := c.doRequest("json")
+	if res != nil && res.StatusCode == http.StatusNotModified {
+		if res.Body != nil {
+			res.Body.Close()
+		}
+		return nil, gensupport.WrapError(&googleapi.Error{
+			Code:   res.StatusCode,
+			Header: res.Header,
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, gensupport.WrapError(err)
+	}
+	ret := &GenerateCseTokenResponse{
+		ServerResponse: googleapi.ServerResponse{
+			Header:         res.Header,
+			HTTPStatusCode: res.StatusCode,
+		},
+	}
+	target := &ret
+	b, err := gensupport.DecodeResponseBytes(target, res)
+	if err != nil {
+		return nil, err
+	}
+	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "drive.files.generateCseToken", "response", internallog.HTTPResponse(res, b))
+	return ret, nil
+}
+
 type FilesGenerateIdsCall struct {
 	s            *Service
 	urlParams_   gensupport.URLParams
@@ -6747,7 +7442,8 @@ type FilesGenerateIdsCall struct {
 }
 
 // GenerateIds: Generates a set of file IDs which can be provided in create or
-// copy requests.
+// copy requests. For more information, see Create and manage files
+// (https://developers.google.com/workspace/drive/api/guides/create-file).
 func (r *FilesService) GenerateIds() *FilesGenerateIdsCall {
 	c := &FilesGenerateIdsCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	return c
@@ -6760,16 +7456,19 @@ func (c *FilesGenerateIdsCall) Count(count int64) *FilesGenerateIdsCall {
 }
 
 // Space sets the optional parameter "space": The space in which the IDs can be
-// used to create new files. Supported values are 'drive' and 'appDataFolder'.
-// (Default: 'drive')
+// used to create files. Supported values are `drive` and `appDataFolder`.
+// (Default: `drive`.) For more information, see File organization
+// (https://developers.google.com/workspace/drive/api/guides/about-files#file-organization).
 func (c *FilesGenerateIdsCall) Space(space string) *FilesGenerateIdsCall {
 	c.urlParams_.Set("space", space)
 	return c
 }
 
 // Type sets the optional parameter "type": The type of items which the IDs can
-// be used for. Supported values are 'files' and 'shortcuts'. Note that
-// 'shortcuts' are only supported in the `drive` 'space'. (Default: 'files')
+// be used for. Supported values are `files` and `shortcuts`. Note that
+// `shortcuts` are only supported in the `drive` `space`. (Default: `files`.)
+// For more information, see File organization
+// (https://developers.google.com/workspace/drive/api/guides/about-files#file-organization).
 func (c *FilesGenerateIdsCall) Type(type_ string) *FilesGenerateIdsCall {
 	c.urlParams_.Set("type", type_)
 	return c
@@ -6872,13 +7571,16 @@ type FilesGetCall struct {
 	header_      http.Header
 }
 
-// Get:  Gets a file's metadata or content by ID. If you provide the URL
-// parameter `alt=media`, then the response includes the file contents in the
-// response body. Downloading content with `alt=media` only works if the file
-// is stored in Drive. To download Google Docs, Sheets, and Slides use
-// `files.export` (/workspace/drive/api/reference/rest/v3/files/export)
-// instead. For more information, see Download & export files
-// (/workspace/drive/api/guides/manage-downloads).
+// Get:  Gets a file's metadata or content by ID. For more information, see
+// Search for files and folders
+// (https://developers.google.com/workspace/drive/api/guides/search-files). If
+// you provide the URL parameter `alt=media`, then the response includes the
+// file contents in the response body. Downloading content with `alt=media`
+// only works if the file is stored in Drive. To download Google Docs, Sheets,
+// and Slides use `files.export`
+// (https://developers.google.com/workspace/drive/api/reference/rest/v3/files/export)
+// instead. For more information, see Download and export files
+// (https://developers.google.com/workspace/drive/api/guides/manage-downloads).
 //
 // - fileId: The ID of the file.
 func (r *FilesService) Get(fileId string) *FilesGetCall {
@@ -6906,7 +7608,7 @@ func (c *FilesGetCall) IncludeLabels(includeLabels string) *FilesGetCall {
 
 // IncludePermissionsForView sets the optional parameter
 // "includePermissionsForView": Specifies which additional view's permissions
-// to include in the response. Only 'published' is supported.
+// to include in the response. Only `published` is supported.
 func (c *FilesGetCall) IncludePermissionsForView(includePermissionsForView string) *FilesGetCall {
 	c.urlParams_.Set("includePermissionsForView", includePermissionsForView)
 	return c
@@ -7041,30 +7743,33 @@ type FilesListCall struct {
 	header_      http.Header
 }
 
-// List:  Lists the user's files. This method accepts the `q` parameter, which
-// is a search query combining one or more search terms. For more information,
-// see the Search for files & folders
-// (/workspace/drive/api/guides/search-files) guide. *Note:* This method
-// returns *all* files by default, including trashed files. If you don't want
-// trashed files to appear in the list, use the `trashed=false` query parameter
-// to remove trashed files from the results.
+// List:  Lists the user's files. For more information, see Search for files
+// and folders
+// (https://developers.google.com/workspace/drive/api/guides/search-files).
+// This method accepts the `q` parameter, which is a search query combining one
+// or more search terms. This method returns *all* files by default, including
+// trashed files. If you don't want trashed files to appear in the list, use
+// the `trashed=false` query parameter to remove trashed files from the
+// results.
 func (r *FilesService) List() *FilesListCall {
 	c := &FilesListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	return c
 }
 
-// Corpora sets the optional parameter "corpora": Bodies of items
-// (files/documents) to which the query applies. Supported bodies are 'user',
-// 'domain', 'drive', and 'allDrives'. Prefer 'user' or 'drive' to 'allDrives'
-// for efficiency. By default, corpora is set to 'user'. However, this can
-// change depending on the filter set through the 'q' parameter.
+// Corpora sets the optional parameter "corpora": Specifies a collection of
+// items (files or documents) to which the query applies. Supported items
+// include: * `user` * `domain` * `drive` * `allDrives` Prefer `user` or
+// `drive` to `allDrives` for efficiency. By default, corpora is set to `user`.
+// However, this can change depending on the filter set through the `q`
+// parameter. For more information, see File organization
+// (https://developers.google.com/workspace/drive/api/guides/about-files#file-organization).
 func (c *FilesListCall) Corpora(corpora string) *FilesListCall {
 	c.urlParams_.Set("corpora", corpora)
 	return c
 }
 
 // Corpus sets the optional parameter "corpus": Deprecated: The source of files
-// to list. Use 'corpora' instead.
+// to list. Use `corpora` instead.
 //
 // Possible values:
 //
@@ -7099,7 +7804,7 @@ func (c *FilesListCall) IncludeLabels(includeLabels string) *FilesListCall {
 
 // IncludePermissionsForView sets the optional parameter
 // "includePermissionsForView": Specifies which additional view's permissions
-// to include in the response. Only 'published' is supported.
+// to include in the response. Only `published` is supported.
 func (c *FilesListCall) IncludePermissionsForView(includePermissionsForView string) *FilesListCall {
 	c.urlParams_.Set("includePermissionsForView", includePermissionsForView)
 	return c
@@ -7113,20 +7818,22 @@ func (c *FilesListCall) IncludeTeamDriveItems(includeTeamDriveItems bool) *Files
 }
 
 // OrderBy sets the optional parameter "orderBy": A comma-separated list of
-// sort keys. Valid keys are: * `createdTime`: When the file was created. *
-// `folder`: The folder ID. This field is sorted using alphabetical ordering. *
-// `modifiedByMeTime`: The last time the file was modified by the user. *
-// `modifiedTime`: The last time the file was modified by anyone. * `name`: The
-// name of the file. This field is sorted using alphabetical ordering, so 1,
-// 12, 2, 22. * `name_natural`: The name of the file. This field is sorted
-// using natural sort ordering, so 1, 2, 12, 22. * `quotaBytesUsed`: The number
-// of storage quota bytes used by the file. * `recency`: The most recent
-// timestamp from the file's date-time fields. * `sharedWithMeTime`: When the
-// file was shared with the user, if applicable. * `starred`: Whether the user
-// has starred the file. * `viewedByMeTime`: The last time the file was viewed
-// by the user. Each key sorts ascending by default, but can be reversed with
-// the 'desc' modifier. Example usage: `?orderBy=folder,modifiedTime
-// desc,name`.
+// sort keys. Valid keys are: * `createdTime`: When the file was created. Avoid
+// using this key for queries on large item collections as it might result in
+// timeouts or other issues. For time-related sorting on large item
+// collections, use `modifiedTime` instead. * `folder`: The folder ID. This
+// field is sorted using alphabetical ordering. * `modifiedByMeTime`: The last
+// time the file was modified by the user. * `modifiedTime`: The last time the
+// file was modified by anyone. * `name`: The name of the file. This field is
+// sorted using alphabetical ordering, so 1, 12, 2, 22. * `name_natural`: The
+// name of the file. This field is sorted using natural sort ordering, so 1, 2,
+// 12, 22. * `quotaBytesUsed`: The number of storage quota bytes used by the
+// file. * `recency`: The most recent timestamp from the file's date-time
+// fields. * `sharedWithMeTime`: When the file was shared with the user, if
+// applicable. * `starred`: Whether the user has starred the file. *
+// `viewedByMeTime`: The last time the file was viewed by the user. Each key
+// sorts ascending by default, but can be reversed with the `desc` modifier.
+// Example usage: `?orderBy=folder,modifiedTime desc,name`.
 func (c *FilesListCall) OrderBy(orderBy string) *FilesListCall {
 	c.urlParams_.Set("orderBy", orderBy)
 	return c
@@ -7142,22 +7849,24 @@ func (c *FilesListCall) PageSize(pageSize int64) *FilesListCall {
 
 // PageToken sets the optional parameter "pageToken": The token for continuing
 // a previous list request on the next page. This should be set to the value of
-// 'nextPageToken' from the previous response.
+// `nextPageToken` from the previous response.
 func (c *FilesListCall) PageToken(pageToken string) *FilesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
 	return c
 }
 
 // Q sets the optional parameter "q": A query for filtering the file results.
-// See the "Search for files & folders" guide for supported syntax.
+// For supported syntax, see Search for files and folders
+// (/workspace/drive/api/guides/search-files).
 func (c *FilesListCall) Q(q string) *FilesListCall {
 	c.urlParams_.Set("q", q)
 	return c
 }
 
 // Spaces sets the optional parameter "spaces": A comma-separated list of
-// spaces to query within the corpora. Supported values are 'drive' and
-// 'appDataFolder'.
+// spaces to query within the corpora. Supported values are `drive` and
+// `appDataFolder`. For more information, see File organization
+// (https://developers.google.com/workspace/drive/api/guides/about-files#file-organization).
 func (c *FilesListCall) Spaces(spaces string) *FilesListCall {
 	c.urlParams_.Set("spaces", spaces)
 	return c
@@ -7302,7 +8011,9 @@ type FilesListLabelsCall struct {
 	header_      http.Header
 }
 
-// ListLabels: Lists the labels on a file.
+// ListLabels: Lists the labels on a file. For more information, see List
+// labels on a file
+// (https://developers.google.com/workspace/drive/api/guides/list-labels).
 //
 // - fileId: The ID for the file.
 func (r *FilesService) ListLabels(fileId string) *FilesListLabelsCall {
@@ -7320,7 +8031,7 @@ func (c *FilesListLabelsCall) MaxResults(maxResults int64) *FilesListLabelsCall 
 
 // PageToken sets the optional parameter "pageToken": The token for continuing
 // a previous list request on the next page. This should be set to the value of
-// 'nextPageToken' from the previous response.
+// `nextPageToken` from the previous response.
 func (c *FilesListLabelsCall) PageToken(pageToken string) *FilesListLabelsCall {
 	c.urlParams_.Set("pageToken", pageToken)
 	return c
@@ -7447,8 +8158,10 @@ type FilesModifyLabelsCall struct {
 	header_             http.Header
 }
 
-// ModifyLabels: Modifies the set of labels applied to a file. Returns a list
-// of the labels that were added or modified.
+// ModifyLabels: Modifies the set of labels applied to a file. For more
+// information, see Set a label field on a file
+// (https://developers.google.com/workspace/drive/api/guides/set-label).
+// Returns a list of the labels that were added or modified.
 //
 // - fileId: The ID of the file to which the labels belong.
 func (r *FilesService) ModifyLabels(fileId string, modifylabelsrequest *ModifyLabelsRequest) *FilesModifyLabelsCall {
@@ -7553,16 +8266,19 @@ type FilesUpdateCall struct {
 	header_    http.Header
 }
 
-// Update:  Updates a file's metadata and/or content. When calling this method,
-// only populate fields in the request that you want to modify. When updating
-// fields, some fields might be changed automatically, such as `modifiedDate`.
-// This method supports patch semantics. This method supports an */upload* URI
-// and accepts uploaded media with the following characteristics: - *Maximum
-// file size:* 5,120 GB - *Accepted Media MIME types:*`*/*` Note: Specify a
-// valid MIME type, rather than the literal `*/*` value. The literal `*/*` is
-// only used to indicate that any valid MIME type can be uploaded. For more
-// information on uploading files, see Upload file data
-// (/workspace/drive/api/guides/manage-uploads).
+// Update:  Updates a file's metadata, content, or both. When calling this
+// method, only populate fields in the request that you want to modify. When
+// updating fields, some fields might be changed automatically, such as
+// `modifiedDate`. This method supports patch semantics. This method supports
+// an */upload* URI and accepts uploaded media with the following
+// characteristics: - *Maximum file size:* 5,120 GB - *Accepted Media MIME
+// types:* `*/*` (Specify a valid MIME type, rather than the literal `*/*`
+// value. The literal `*/*` is only used to indicate that any valid MIME type
+// can be uploaded. For more information, see Google Workspace and Google Drive
+// supported MIME types
+// (https://developers.google.com/workspace/drive/api/guides/mime-types).) For
+// more information on uploading files, see Upload file data
+// (https://developers.google.com/workspace/drive/api/guides/manage-uploads).
 //
 // - fileId: The ID of the file.
 func (r *FilesService) Update(fileId string, file *File) *FilesUpdateCall {
@@ -7596,14 +8312,14 @@ func (c *FilesUpdateCall) IncludeLabels(includeLabels string) *FilesUpdateCall {
 
 // IncludePermissionsForView sets the optional parameter
 // "includePermissionsForView": Specifies which additional view's permissions
-// to include in the response. Only 'published' is supported.
+// to include in the response. Only `published` is supported.
 func (c *FilesUpdateCall) IncludePermissionsForView(includePermissionsForView string) *FilesUpdateCall {
 	c.urlParams_.Set("includePermissionsForView", includePermissionsForView)
 	return c
 }
 
 // KeepRevisionForever sets the optional parameter "keepRevisionForever":
-// Whether to set the 'keepForever' field in the new head revision. This is
+// Whether to set the `keepForever` field in the new head revision. This is
 // only applicable to files with binary content in Google Drive. Only 200
 // revisions for the file can be kept forever. If the limit is reached, try
 // deleting pinned revisions.
@@ -7803,7 +8519,9 @@ type FilesWatchCall struct {
 	header_    http.Header
 }
 
-// Watch: Subscribes to changes to a file.
+// Watch: Subscribes to changes to a file. For more information, see
+// Notifications for resource changes
+// (https://developers.google.com/workspace/drive/api/guides/push).
 //
 // - fileId: The ID of the file.
 func (r *FilesService) Watch(fileId string, channel *Channel) *FilesWatchCall {
@@ -7832,7 +8550,7 @@ func (c *FilesWatchCall) IncludeLabels(includeLabels string) *FilesWatchCall {
 
 // IncludePermissionsForView sets the optional parameter
 // "includePermissionsForView": Specifies which additional view's permissions
-// to include in the response. Only 'published' is supported.
+// to include in the response. Only `published` is supported.
 func (c *FilesWatchCall) IncludePermissionsForView(includePermissionsForView string) *FilesWatchCall {
 	c.urlParams_.Set("includePermissionsForView", includePermissionsForView)
 	return c
@@ -7934,163 +8652,6 @@ func (c *FilesWatchCall) Do(opts ...googleapi.CallOption) (*Channel, error) {
 	}
 	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "drive.files.watch", "response", internallog.HTTPResponse(res, b))
 	return ret, nil
-}
-
-type OperationsCancelCall struct {
-	s          *Service
-	name       string
-	urlParams_ gensupport.URLParams
-	ctx_       context.Context
-	header_    http.Header
-}
-
-// Cancel: Starts asynchronous cancellation on a long-running operation. The
-// server makes a best effort to cancel the operation, but success is not
-// guaranteed. If the server doesn't support this method, it returns
-// `google.rpc.Code.UNIMPLEMENTED`. Clients can use Operations.GetOperation or
-// other methods to check whether the cancellation succeeded or whether the
-// operation completed despite cancellation. On successful cancellation, the
-// operation is not deleted; instead, it becomes an operation with an
-// Operation.error value with a google.rpc.Status.code of `1`, corresponding to
-// `Code.CANCELLED`.
-//
-// - name: The name of the operation resource to be cancelled.
-func (r *OperationsService) Cancel(name string) *OperationsCancelCall {
-	c := &OperationsCancelCall{s: r.s, urlParams_: make(gensupport.URLParams)}
-	c.name = name
-	return c
-}
-
-// Fields allows partial responses to be retrieved. See
-// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse for more
-// details.
-func (c *OperationsCancelCall) Fields(s ...googleapi.Field) *OperationsCancelCall {
-	c.urlParams_.Set("fields", googleapi.CombineFields(s))
-	return c
-}
-
-// Context sets the context to be used in this call's Do method.
-func (c *OperationsCancelCall) Context(ctx context.Context) *OperationsCancelCall {
-	c.ctx_ = ctx
-	return c
-}
-
-// Header returns a http.Header that can be modified by the caller to add
-// headers to the request.
-func (c *OperationsCancelCall) Header() http.Header {
-	if c.header_ == nil {
-		c.header_ = make(http.Header)
-	}
-	return c.header_
-}
-
-func (c *OperationsCancelCall) doRequest(alt string) (*http.Response, error) {
-	reqHeaders := gensupport.SetHeaders(c.s.userAgent(), "", c.header_)
-	c.urlParams_.Set("alt", alt)
-	c.urlParams_.Set("prettyPrint", "false")
-	urls := googleapi.ResolveRelative(c.s.BasePath, "operations/{name}:cancel")
-	urls += "?" + c.urlParams_.Encode()
-	req, err := http.NewRequest("POST", urls, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header = reqHeaders
-	googleapi.Expand(req.URL, map[string]string{
-		"name": c.name,
-	})
-	c.s.logger.DebugContext(c.ctx_, "api request", "serviceName", apiName, "rpcName", "drive.operations.cancel", "request", internallog.HTTPRequest(req, nil))
-	return gensupport.SendRequest(c.ctx_, c.s.client, req)
-}
-
-// Do executes the "drive.operations.cancel" call.
-func (c *OperationsCancelCall) Do(opts ...googleapi.CallOption) error {
-	gensupport.SetOptions(c.urlParams_, opts...)
-	res, err := c.doRequest("json")
-	if err != nil {
-		return err
-	}
-	defer googleapi.CloseBody(res)
-	if err := googleapi.CheckResponse(res); err != nil {
-		return gensupport.WrapError(err)
-	}
-	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "drive.operations.cancel", "response", internallog.HTTPResponse(res, nil))
-	return nil
-}
-
-type OperationsDeleteCall struct {
-	s          *Service
-	name       string
-	urlParams_ gensupport.URLParams
-	ctx_       context.Context
-	header_    http.Header
-}
-
-// Delete: Deletes a long-running operation. This method indicates that the
-// client is no longer interested in the operation result. It does not cancel
-// the operation. If the server doesn't support this method, it returns
-// `google.rpc.Code.UNIMPLEMENTED`.
-//
-// - name: The name of the operation resource to be deleted.
-func (r *OperationsService) Delete(name string) *OperationsDeleteCall {
-	c := &OperationsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
-	c.name = name
-	return c
-}
-
-// Fields allows partial responses to be retrieved. See
-// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse for more
-// details.
-func (c *OperationsDeleteCall) Fields(s ...googleapi.Field) *OperationsDeleteCall {
-	c.urlParams_.Set("fields", googleapi.CombineFields(s))
-	return c
-}
-
-// Context sets the context to be used in this call's Do method.
-func (c *OperationsDeleteCall) Context(ctx context.Context) *OperationsDeleteCall {
-	c.ctx_ = ctx
-	return c
-}
-
-// Header returns a http.Header that can be modified by the caller to add
-// headers to the request.
-func (c *OperationsDeleteCall) Header() http.Header {
-	if c.header_ == nil {
-		c.header_ = make(http.Header)
-	}
-	return c.header_
-}
-
-func (c *OperationsDeleteCall) doRequest(alt string) (*http.Response, error) {
-	reqHeaders := gensupport.SetHeaders(c.s.userAgent(), "", c.header_)
-	c.urlParams_.Set("alt", alt)
-	c.urlParams_.Set("prettyPrint", "false")
-	urls := googleapi.ResolveRelative(c.s.BasePath, "operations/{name}")
-	urls += "?" + c.urlParams_.Encode()
-	req, err := http.NewRequest("DELETE", urls, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header = reqHeaders
-	googleapi.Expand(req.URL, map[string]string{
-		"name": c.name,
-	})
-	c.s.logger.DebugContext(c.ctx_, "api request", "serviceName", apiName, "rpcName", "drive.operations.delete", "request", internallog.HTTPRequest(req, nil))
-	return gensupport.SendRequest(c.ctx_, c.s.client, req)
-}
-
-// Do executes the "drive.operations.delete" call.
-func (c *OperationsDeleteCall) Do(opts ...googleapi.CallOption) error {
-	gensupport.SetOptions(c.urlParams_, opts...)
-	res, err := c.doRequest("json")
-	if err != nil {
-		return err
-	}
-	defer googleapi.CloseBody(res)
-	if err := googleapi.CheckResponse(res); err != nil {
-		return gensupport.WrapError(err)
-	}
-	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "drive.operations.delete", "response", internallog.HTTPResponse(res, nil))
-	return nil
 }
 
 type OperationsGetCall struct {
@@ -8204,158 +8765,6 @@ func (c *OperationsGetCall) Do(opts ...googleapi.CallOption) (*Operation, error)
 	return ret, nil
 }
 
-type OperationsListCall struct {
-	s            *Service
-	urlParams_   gensupport.URLParams
-	ifNoneMatch_ string
-	ctx_         context.Context
-	header_      http.Header
-}
-
-// List: Lists operations that match the specified filter in the request. If
-// the server doesn't support this method, it returns `UNIMPLEMENTED`.
-func (r *OperationsService) List() *OperationsListCall {
-	c := &OperationsListCall{s: r.s, urlParams_: make(gensupport.URLParams)}
-	return c
-}
-
-// Filter sets the optional parameter "filter": The standard list filter.
-func (c *OperationsListCall) Filter(filter string) *OperationsListCall {
-	c.urlParams_.Set("filter", filter)
-	return c
-}
-
-// Name sets the optional parameter "name": The name of the operation's parent
-// resource.
-func (c *OperationsListCall) Name(name string) *OperationsListCall {
-	c.urlParams_.Set("name", name)
-	return c
-}
-
-// PageSize sets the optional parameter "pageSize": The standard list page
-// size.
-func (c *OperationsListCall) PageSize(pageSize int64) *OperationsListCall {
-	c.urlParams_.Set("pageSize", fmt.Sprint(pageSize))
-	return c
-}
-
-// PageToken sets the optional parameter "pageToken": The standard list page
-// token.
-func (c *OperationsListCall) PageToken(pageToken string) *OperationsListCall {
-	c.urlParams_.Set("pageToken", pageToken)
-	return c
-}
-
-// Fields allows partial responses to be retrieved. See
-// https://developers.google.com/gdata/docs/2.0/basics#PartialResponse for more
-// details.
-func (c *OperationsListCall) Fields(s ...googleapi.Field) *OperationsListCall {
-	c.urlParams_.Set("fields", googleapi.CombineFields(s))
-	return c
-}
-
-// IfNoneMatch sets an optional parameter which makes the operation fail if the
-// object's ETag matches the given value. This is useful for getting updates
-// only after the object has changed since the last request.
-func (c *OperationsListCall) IfNoneMatch(entityTag string) *OperationsListCall {
-	c.ifNoneMatch_ = entityTag
-	return c
-}
-
-// Context sets the context to be used in this call's Do method.
-func (c *OperationsListCall) Context(ctx context.Context) *OperationsListCall {
-	c.ctx_ = ctx
-	return c
-}
-
-// Header returns a http.Header that can be modified by the caller to add
-// headers to the request.
-func (c *OperationsListCall) Header() http.Header {
-	if c.header_ == nil {
-		c.header_ = make(http.Header)
-	}
-	return c.header_
-}
-
-func (c *OperationsListCall) doRequest(alt string) (*http.Response, error) {
-	reqHeaders := gensupport.SetHeaders(c.s.userAgent(), "", c.header_)
-	if c.ifNoneMatch_ != "" {
-		reqHeaders.Set("If-None-Match", c.ifNoneMatch_)
-	}
-	c.urlParams_.Set("alt", alt)
-	c.urlParams_.Set("prettyPrint", "false")
-	urls := googleapi.ResolveRelative(c.s.BasePath, "operations")
-	urls += "?" + c.urlParams_.Encode()
-	req, err := http.NewRequest("GET", urls, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header = reqHeaders
-	c.s.logger.DebugContext(c.ctx_, "api request", "serviceName", apiName, "rpcName", "drive.operations.list", "request", internallog.HTTPRequest(req, nil))
-	return gensupport.SendRequest(c.ctx_, c.s.client, req)
-}
-
-// Do executes the "drive.operations.list" call.
-// Any non-2xx status code is an error. Response headers are in either
-// *ListOperationsResponse.ServerResponse.Header or (if a response was returned
-// at all) in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
-// check whether the returned error was because http.StatusNotModified was
-// returned.
-func (c *OperationsListCall) Do(opts ...googleapi.CallOption) (*ListOperationsResponse, error) {
-	gensupport.SetOptions(c.urlParams_, opts...)
-	res, err := c.doRequest("json")
-	if res != nil && res.StatusCode == http.StatusNotModified {
-		if res.Body != nil {
-			res.Body.Close()
-		}
-		return nil, gensupport.WrapError(&googleapi.Error{
-			Code:   res.StatusCode,
-			Header: res.Header,
-		})
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer googleapi.CloseBody(res)
-	if err := googleapi.CheckResponse(res); err != nil {
-		return nil, gensupport.WrapError(err)
-	}
-	ret := &ListOperationsResponse{
-		ServerResponse: googleapi.ServerResponse{
-			Header:         res.Header,
-			HTTPStatusCode: res.StatusCode,
-		},
-	}
-	target := &ret
-	b, err := gensupport.DecodeResponseBytes(target, res)
-	if err != nil {
-		return nil, err
-	}
-	c.s.logger.DebugContext(c.ctx_, "api response", "serviceName", apiName, "rpcName", "drive.operations.list", "response", internallog.HTTPResponse(res, b))
-	return ret, nil
-}
-
-// Pages invokes f for each page of results.
-// A non-nil error returned from f will halt the iteration.
-// The provided context supersedes any context provided to the Context method.
-func (c *OperationsListCall) Pages(ctx context.Context, f func(*ListOperationsResponse) error) error {
-	c.ctx_ = ctx
-	defer c.PageToken(c.urlParams_.Get("pageToken"))
-	for {
-		x, err := c.Do()
-		if err != nil {
-			return err
-		}
-		if err := f(x); err != nil {
-			return err
-		}
-		if x.NextPageToken == "" {
-			return nil
-		}
-		c.PageToken(x.NextPageToken)
-	}
-}
-
 type PermissionsCreateCall struct {
 	s          *Service
 	fileId     string
@@ -8365,9 +8774,11 @@ type PermissionsCreateCall struct {
 	header_    http.Header
 }
 
-// Create: Creates a permission for a file or shared drive. **Warning:**
-// Concurrent permissions operations on the same file are not supported; only
-// the last update is applied.
+// Create: Creates a permission for a file or shared drive. For more
+// information, see Share files, folders, and drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-sharing).
+// **Warning:** Concurrent permissions operations on the same file aren't
+// supported; only the last update is applied.
 //
 // - fileId: The ID of the file or shared drive.
 func (r *PermissionsService) Create(fileId string, permission *Permission) *PermissionsCreateCall {
@@ -8385,7 +8796,7 @@ func (c *PermissionsCreateCall) EmailMessage(emailMessage string) *PermissionsCr
 }
 
 // EnforceExpansiveAccess sets the optional parameter "enforceExpansiveAccess":
-// Whether the request should enforce expansive access rules.
+// Deprecated: All requests use the expansive access rules.
 func (c *PermissionsCreateCall) EnforceExpansiveAccess(enforceExpansiveAccess bool) *PermissionsCreateCall {
 	c.urlParams_.Set("enforceExpansiveAccess", fmt.Sprint(enforceExpansiveAccess))
 	return c
@@ -8399,10 +8810,10 @@ func (c *PermissionsCreateCall) EnforceSingleParent(enforceSingleParent bool) *P
 }
 
 // MoveToNewOwnersRoot sets the optional parameter "moveToNewOwnersRoot": This
-// parameter will only take effect if the item is not in a shared drive and the
+// parameter only takes effect if the item isn't in a shared drive and the
 // request is attempting to transfer the ownership of the item. If set to
-// `true`, the item will be moved to the new owner's My Drive root folder and
-// all prior parents removed. If set to `false`, parents are not changed.
+// `true`, the item is moved to the new owner's My Drive root folder and all
+// prior parents removed. If set to `false`, parents aren't changed.
 func (c *PermissionsCreateCall) MoveToNewOwnersRoot(moveToNewOwnersRoot bool) *PermissionsCreateCall {
 	c.urlParams_.Set("moveToNewOwnersRoot", fmt.Sprint(moveToNewOwnersRoot))
 	return c
@@ -8410,7 +8821,7 @@ func (c *PermissionsCreateCall) MoveToNewOwnersRoot(moveToNewOwnersRoot bool) *P
 
 // SendNotificationEmail sets the optional parameter "sendNotificationEmail":
 // Whether to send a notification email when sharing to users or groups. This
-// defaults to true for users and groups, and is not allowed for other
+// defaults to `true` for users and groups, and is not allowed for other
 // requests. It must not be disabled for ownership transfers.
 func (c *PermissionsCreateCall) SendNotificationEmail(sendNotificationEmail bool) *PermissionsCreateCall {
 	c.urlParams_.Set("sendNotificationEmail", fmt.Sprint(sendNotificationEmail))
@@ -8434,17 +8845,20 @@ func (c *PermissionsCreateCall) SupportsTeamDrives(supportsTeamDrives bool) *Per
 // TransferOwnership sets the optional parameter "transferOwnership": Whether
 // to transfer ownership to the specified user and downgrade the current owner
 // to a writer. This parameter is required as an acknowledgement of the side
-// effect.
+// effect. For more information, see Transfer file ownership
+// (https://developers.google.com/workspace/drive/api/guides/transfer-file).
 func (c *PermissionsCreateCall) TransferOwnership(transferOwnership bool) *PermissionsCreateCall {
 	c.urlParams_.Set("transferOwnership", fmt.Sprint(transferOwnership))
 	return c
 }
 
 // UseDomainAdminAccess sets the optional parameter "useDomainAdminAccess":
-// Issue the request as a domain administrator; if set to true, then the
-// requester will be granted access if the file ID parameter refers to a shared
-// drive and the requester is an administrator of the domain to which the
-// shared drive belongs.
+// Issue the request as a domain administrator. If set to `true`, and if the
+// following additional conditions are met, the requester is granted access: 1.
+// The file ID parameter refers to a shared drive. 2. The requester is an
+// administrator of the domain to which the shared drive belongs. For more
+// information, see Manage shared drives as domain administrators
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives#manage-administrators).
 func (c *PermissionsCreateCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsCreateCall {
 	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
@@ -8543,8 +8957,11 @@ type PermissionsDeleteCall struct {
 	header_      http.Header
 }
 
-// Delete: Deletes a permission. **Warning:** Concurrent permissions operations
-// on the same file are not supported; only the last update is applied.
+// Delete: Deletes a permission. For more information, see Share files,
+// folders, and drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-sharing).
+// **Warning:** Concurrent permissions operations on the same file aren't
+// supported; only the last update is applied.
 //
 // - fileId: The ID of the file or shared drive.
 // - permissionId: The ID of the permission.
@@ -8556,7 +8973,7 @@ func (r *PermissionsService) Delete(fileId string, permissionId string) *Permiss
 }
 
 // EnforceExpansiveAccess sets the optional parameter "enforceExpansiveAccess":
-// Whether the request should enforce expansive access rules.
+// Deprecated: All requests use the expansive access rules.
 func (c *PermissionsDeleteCall) EnforceExpansiveAccess(enforceExpansiveAccess bool) *PermissionsDeleteCall {
 	c.urlParams_.Set("enforceExpansiveAccess", fmt.Sprint(enforceExpansiveAccess))
 	return c
@@ -8577,10 +8994,12 @@ func (c *PermissionsDeleteCall) SupportsTeamDrives(supportsTeamDrives bool) *Per
 }
 
 // UseDomainAdminAccess sets the optional parameter "useDomainAdminAccess":
-// Issue the request as a domain administrator; if set to true, then the
-// requester will be granted access if the file ID parameter refers to a shared
-// drive and the requester is an administrator of the domain to which the
-// shared drive belongs.
+// Issue the request as a domain administrator. If set to `true`, and if the
+// following additional conditions are met, the requester is granted access: 1.
+// The file ID parameter refers to a shared drive. 2. The requester is an
+// administrator of the domain to which the shared drive belongs. For more
+// information, see Manage shared drives as domain administrators
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives#manage-administrators).
 func (c *PermissionsDeleteCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsDeleteCall {
 	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
@@ -8653,7 +9072,9 @@ type PermissionsGetCall struct {
 	header_      http.Header
 }
 
-// Get: Gets a permission by ID.
+// Get: Gets a permission by ID. For more information, see Share files,
+// folders, and drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-sharing).
 //
 // - fileId: The ID of the file.
 // - permissionId: The ID of the permission.
@@ -8679,10 +9100,12 @@ func (c *PermissionsGetCall) SupportsTeamDrives(supportsTeamDrives bool) *Permis
 }
 
 // UseDomainAdminAccess sets the optional parameter "useDomainAdminAccess":
-// Issue the request as a domain administrator; if set to true, then the
-// requester will be granted access if the file ID parameter refers to a shared
-// drive and the requester is an administrator of the domain to which the
-// shared drive belongs.
+// Issue the request as a domain administrator. If set to `true`, and if the
+// following additional conditions are met, the requester is granted access: 1.
+// The file ID parameter refers to a shared drive. 2. The requester is an
+// administrator of the domain to which the shared drive belongs. For more
+// information, see Manage shared drives as domain administrators
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives#manage-administrators).
 func (c *PermissionsGetCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsGetCall {
 	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
@@ -8789,7 +9212,9 @@ type PermissionsListCall struct {
 	header_      http.Header
 }
 
-// List: Lists a file's or shared drive's permissions.
+// List: Lists a file's or shared drive's permissions. For more information,
+// see Share files, folders, and drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-sharing).
 //
 // - fileId: The ID of the file or shared drive.
 func (r *PermissionsService) List(fileId string) *PermissionsListCall {
@@ -8800,7 +9225,7 @@ func (r *PermissionsService) List(fileId string) *PermissionsListCall {
 
 // IncludePermissionsForView sets the optional parameter
 // "includePermissionsForView": Specifies which additional view's permissions
-// to include in the response. Only 'published' is supported.
+// to include in the response. Only `published` is supported.
 func (c *PermissionsListCall) IncludePermissionsForView(includePermissionsForView string) *PermissionsListCall {
 	c.urlParams_.Set("includePermissionsForView", includePermissionsForView)
 	return c
@@ -8817,7 +9242,7 @@ func (c *PermissionsListCall) PageSize(pageSize int64) *PermissionsListCall {
 
 // PageToken sets the optional parameter "pageToken": The token for continuing
 // a previous list request on the next page. This should be set to the value of
-// 'nextPageToken' from the previous response.
+// `nextPageToken` from the previous response.
 func (c *PermissionsListCall) PageToken(pageToken string) *PermissionsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
 	return c
@@ -8838,10 +9263,12 @@ func (c *PermissionsListCall) SupportsTeamDrives(supportsTeamDrives bool) *Permi
 }
 
 // UseDomainAdminAccess sets the optional parameter "useDomainAdminAccess":
-// Issue the request as a domain administrator; if set to true, then the
-// requester will be granted access if the file ID parameter refers to a shared
-// drive and the requester is an administrator of the domain to which the
-// shared drive belongs.
+// Issue the request as a domain administrator. If set to `true`, and if the
+// following additional conditions are met, the requester is granted access: 1.
+// The file ID parameter refers to a shared drive. 2. The requester is an
+// administrator of the domain to which the shared drive belongs. For more
+// information, see Manage shared drives as domain administrators
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives#manage-administrators).
 func (c *PermissionsListCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsListCall {
 	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
@@ -8969,9 +9396,11 @@ type PermissionsUpdateCall struct {
 	header_      http.Header
 }
 
-// Update: Updates a permission with patch semantics. **Warning:** Concurrent
-// permissions operations on the same file are not supported; only the last
-// update is applied.
+// Update: Updates a permission with patch semantics. For more information, see
+// Share files, folders, and drives
+// (https://developers.google.com/workspace/drive/api/guides/manage-sharing).
+// **Warning:** Concurrent permissions operations on the same file aren't
+// supported; only the last update is applied.
 //
 // - fileId: The ID of the file or shared drive.
 // - permissionId: The ID of the permission.
@@ -8984,7 +9413,7 @@ func (r *PermissionsService) Update(fileId string, permissionId string, permissi
 }
 
 // EnforceExpansiveAccess sets the optional parameter "enforceExpansiveAccess":
-// Whether the request should enforce expansive access rules.
+// Deprecated: All requests use the expansive access rules.
 func (c *PermissionsUpdateCall) EnforceExpansiveAccess(enforceExpansiveAccess bool) *PermissionsUpdateCall {
 	c.urlParams_.Set("enforceExpansiveAccess", fmt.Sprint(enforceExpansiveAccess))
 	return c
@@ -9014,17 +9443,20 @@ func (c *PermissionsUpdateCall) SupportsTeamDrives(supportsTeamDrives bool) *Per
 // TransferOwnership sets the optional parameter "transferOwnership": Whether
 // to transfer ownership to the specified user and downgrade the current owner
 // to a writer. This parameter is required as an acknowledgement of the side
-// effect.
+// effect. For more information, see Transfer file ownership
+// (https://developers.google.com//workspace/drive/api/guides/transfer-file).
 func (c *PermissionsUpdateCall) TransferOwnership(transferOwnership bool) *PermissionsUpdateCall {
 	c.urlParams_.Set("transferOwnership", fmt.Sprint(transferOwnership))
 	return c
 }
 
 // UseDomainAdminAccess sets the optional parameter "useDomainAdminAccess":
-// Issue the request as a domain administrator; if set to true, then the
-// requester will be granted access if the file ID parameter refers to a shared
-// drive and the requester is an administrator of the domain to which the
-// shared drive belongs.
+// Issue the request as a domain administrator. If set to `true`, and if the
+// following additional conditions are met, the requester is granted access: 1.
+// The file ID parameter refers to a shared drive. 2. The requester is an
+// administrator of the domain to which the shared drive belongs. For more
+// information, see Manage shared drives as domain administrators
+// (https://developers.google.com/workspace/drive/api/guides/manage-shareddrives#manage-administrators).
 func (c *PermissionsUpdateCall) UseDomainAdminAccess(useDomainAdminAccess bool) *PermissionsUpdateCall {
 	c.urlParams_.Set("useDomainAdminAccess", fmt.Sprint(useDomainAdminAccess))
 	return c
@@ -9125,7 +9557,9 @@ type RepliesCreateCall struct {
 	header_    http.Header
 }
 
-// Create: Creates a reply to a comment.
+// Create: Creates a reply to a comment. For more information, see Manage
+// comments and replies
+// (https://developers.google.com/workspace/drive/api/guides/manage-comments).
 //
 // - commentId: The ID of the comment.
 // - fileId: The ID of the file.
@@ -9232,7 +9666,9 @@ type RepliesDeleteCall struct {
 	header_    http.Header
 }
 
-// Delete: Deletes a reply.
+// Delete: Deletes a reply. For more information, see Manage comments and
+// replies
+// (https://developers.google.com/workspace/drive/api/guides/manage-comments).
 //
 // - commentId: The ID of the comment.
 // - fileId: The ID of the file.
@@ -9314,7 +9750,9 @@ type RepliesGetCall struct {
 	header_      http.Header
 }
 
-// Get: Gets a reply by ID.
+// Get: Gets a reply by ID. For more information, see Manage comments and
+// replies
+// (https://developers.google.com/workspace/drive/api/guides/manage-comments).
 //
 // - commentId: The ID of the comment.
 // - fileId: The ID of the file.
@@ -9328,7 +9766,7 @@ func (r *RepliesService) Get(fileId string, commentId string, replyId string) *R
 }
 
 // IncludeDeleted sets the optional parameter "includeDeleted": Whether to
-// return deleted replies. Deleted replies will not include their original
+// return deleted replies. Deleted replies don't include their original
 // content.
 func (c *RepliesGetCall) IncludeDeleted(includeDeleted bool) *RepliesGetCall {
 	c.urlParams_.Set("includeDeleted", fmt.Sprint(includeDeleted))
@@ -9438,7 +9876,9 @@ type RepliesListCall struct {
 	header_      http.Header
 }
 
-// List: Lists a comment's replies.
+// List: Lists a comment's replies. For more information, see Manage comments
+// and replies
+// (https://developers.google.com/workspace/drive/api/guides/manage-comments).
 //
 // - commentId: The ID of the comment.
 // - fileId: The ID of the file.
@@ -9450,7 +9890,7 @@ func (r *RepliesService) List(fileId string, commentId string) *RepliesListCall 
 }
 
 // IncludeDeleted sets the optional parameter "includeDeleted": Whether to
-// include deleted replies. Deleted replies will not include their original
+// include deleted replies. Deleted replies don't include their original
 // content.
 func (c *RepliesListCall) IncludeDeleted(includeDeleted bool) *RepliesListCall {
 	c.urlParams_.Set("includeDeleted", fmt.Sprint(includeDeleted))
@@ -9466,7 +9906,7 @@ func (c *RepliesListCall) PageSize(pageSize int64) *RepliesListCall {
 
 // PageToken sets the optional parameter "pageToken": The token for continuing
 // a previous list request on the next page. This should be set to the value of
-// 'nextPageToken' from the previous response.
+// `nextPageToken` from the previous response.
 func (c *RepliesListCall) PageToken(pageToken string) *RepliesListCall {
 	c.urlParams_.Set("pageToken", pageToken)
 	return c
@@ -9596,7 +10036,9 @@ type RepliesUpdateCall struct {
 	header_    http.Header
 }
 
-// Update: Updates a reply with patch semantics.
+// Update: Updates a reply with patch semantics. For more information, see
+// Manage comments and replies
+// (https://developers.google.com/workspace/drive/api/guides/manage-comments).
 //
 // - commentId: The ID of the comment.
 // - fileId: The ID of the file.
@@ -9708,7 +10150,9 @@ type RevisionsDeleteCall struct {
 // Delete: Permanently deletes a file version. You can only delete revisions
 // for files with binary content in Google Drive, like images or videos.
 // Revisions for other files, like Google Docs or Sheets, and the last
-// remaining file version can't be deleted.
+// remaining file version can't be deleted. For more information, see Manage
+// file revisions
+// (https://developers.google.com/drive/api/guides/manage-revisions).
 //
 // - fileId: The ID of the file.
 // - revisionId: The ID of the revision.
@@ -9786,7 +10230,9 @@ type RevisionsGetCall struct {
 	header_      http.Header
 }
 
-// Get: Gets a revision's metadata or content by ID.
+// Get: Gets a revision's metadata or content by ID. For more information, see
+// Manage file revisions
+// (https://developers.google.com/workspace/drive/api/guides/manage-revisions).
 //
 // - fileId: The ID of the file.
 // - revisionId: The ID of the revision.
@@ -9924,7 +10370,15 @@ type RevisionsListCall struct {
 	header_      http.Header
 }
 
-// List: Lists a file's revisions.
+// List: Lists a file's revisions. For more information, see Manage file
+// revisions
+// (https://developers.google.com/workspace/drive/api/guides/manage-revisions).
+// **Important:** The list of revisions returned by this method might be
+// incomplete for files with a large revision history, including frequently
+// edited Google Docs, Sheets, and Slides. Older revisions might be omitted
+// from the response, meaning the first revision returned may not be the oldest
+// existing revision. The revision history visible in the Workspace editor user
+// interface might be more complete than the list returned by the API.
 //
 // - fileId: The ID of the file.
 func (r *RevisionsService) List(fileId string) *RevisionsListCall {
@@ -10070,7 +10524,9 @@ type RevisionsUpdateCall struct {
 	header_    http.Header
 }
 
-// Update: Updates a revision with patch semantics.
+// Update: Updates a revision with patch semantics. For more information, see
+// Manage file revisions
+// (https://developers.google.com/workspace/drive/api/guides/manage-revisions).
 //
 // - fileId: The ID of the file.
 // - revisionId: The ID of the revision.
