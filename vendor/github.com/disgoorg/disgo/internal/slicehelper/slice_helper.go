@@ -1,14 +1,25 @@
 package slicehelper
 
-import "github.com/disgoorg/snowflake/v2"
+import (
+	"strings"
 
+	"github.com/disgoorg/snowflake/v2"
+)
+
+// JoinSnowflakes joins a slice of snowflake IDs into a comma-separated string.
 func JoinSnowflakes(snowflakes []snowflake.ID) string {
-	var str string
+	strs := make([]string, len(snowflakes))
 	for i, s := range snowflakes {
-		str += s.String()
-		if i != len(str)-1 {
-			str += ","
-		}
+		strs[i] = s.String()
 	}
-	return str
+	return strings.Join(strs, ",")
+}
+
+// JoinStrings joins a slice of values with a ~string underlying type into a comma-separated string.
+func JoinStrings[T ~string](vals []T) string {
+	strs := make([]string, len(vals))
+	for i, v := range vals {
+		strs[i] = string(v)
+	}
+	return strings.Join(strs, ",")
 }

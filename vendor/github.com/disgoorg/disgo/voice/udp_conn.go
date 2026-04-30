@@ -1,6 +1,7 @@
 package voice
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -8,17 +9,32 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	"golang.org/x/crypto/nacl/secretbox"
+	"github.com/disgoorg/godave"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 const (
-	// OpusPacketHeaderSize is the size of the opus packet header.
-	OpusPacketHeaderSize = 12
+	// RTPHeaderSize is the size of the opus packet header.
+	RTPHeaderSize = 12
+
+	// RTPVersionPadExtend is the first byte of the RTP header.
+	// Bit index 0 and 1 represent the RTP Protocol version used. Discord uses the latest RTP protocol version, 2.
+	// Bit index 2 represents whether we pad. Opus uses an internal padding system, so RTP padding is not used.
+	// Bit index 3 represents if we use extensions.
+	// Bit index 4 to 7 represent the CC or CSRC count. CSRC is Combined SSRC.
+	RTPVersionPadExtend = 0x80
+
+	// RTPPayloadType is Discord's RTP Profile Payload type.
+	// I've yet to find actual documentation on what the bits inside this value represent.
+	RTPPayloadType = 0x78
+
+	// MaxOpusFrameSize is the max size of an opus frame in bytes.
+	MaxOpusFrameSize = 1400
 
 	// UDPTimeout is the timeout for UDP connections.
 	UDPTimeout = 30 * time.Second
@@ -37,7 +53,9 @@ var (
 
 type (
 	// UDPConnCreateFunc is a function that creates a UDPConn.
-	UDPConnCreateFunc func(opts ...UDPConnConfigOpt) UDPConn
+	UDPConnCreateFunc func(daveSession godave.Session, ssrcLookup SsrcLookupFunc, opts ...UDPConnConfigOpt) UDPConn
+
+	SsrcLookupFunc func(ssrc uint32) snowflake.ID
 
 	// UDPConn represents a UDP connection to discord voice servers. It is used to send/receive voice packets to/from discord.
 	// It implements the io.Reader, io.Writer and io.Closer interface.
@@ -49,7 +67,7 @@ type (
 		RemoteAddr() net.Addr
 
 		// SetSecretKey sets the secret key used to encrypt packets.
-		SetSecretKey(secretKey [32]byte)
+		SetSecretKey(encryptionMode EncryptionMode, secretKey []byte) error
 
 		SetDeadline(t time.Time) error
 
@@ -77,44 +95,56 @@ type (
 
 	// Packet is a voice packet received from discord.
 	Packet struct {
+		Type byte
 		// Sequence is the sequence number of the packet.
 		Sequence uint16
 		// Timestamp is the timestamp of the packet.
 		Timestamp uint32
 		// SSRC is the users SSRC of the packet.
-		SSRC uint32
+		SSRC         uint32
+		HasExtension bool
+		ExtensionID  int
+		Extension    []byte
+		CSRC         []uint32
+		HeaderSize   int
 		// Opus is the actual opus data of the packet.
 		Opus []byte
 	}
 )
 
 // NewUDPConn creates a new voice UDPConn with the given configuration.
-func NewUDPConn(opts ...UDPConnConfigOpt) UDPConn {
-	config := DefaultUDPConnConfig()
-	config.Apply(opts)
-	config.Logger = config.Logger.With(slog.String("name", "voice_conn_udp_conn"))
+func NewUDPConn(daveSession godave.Session, ssrcLookup SsrcLookupFunc, opts ...UDPConnConfigOpt) UDPConn {
+	cfg := defaultUDPConnConfig()
+	cfg.apply(opts)
 
 	return &udpConnImpl{
-		config:        config,
+		daveSession:   daveSession,
+		ssrcLookup:    ssrcLookup,
+		config:        cfg,
 		receiveBuffer: make([]byte, 1400),
+		decryptBuffer: make([]byte, 512),
+		encryptBuffer: make([]byte, 512),
 	}
 }
 
 type udpConnImpl struct {
-	config UDPConnConfig
+	config udpConnConfig
 
 	conn   net.Conn
 	connMu sync.Mutex
 
-	packet    [12]byte
-	secretKey [32]byte
+	encrypter   Encrypter
+	daveSession godave.Session
+	ssrcLookup  SsrcLookupFunc
 
+	header    [12]byte
+	ssrc      uint32
 	sequence  uint16
 	timestamp uint32
-	nonce     [24]byte
 
-	receiveNonce  [24]byte
 	receiveBuffer []byte
+	decryptBuffer []byte
+	encryptBuffer []byte
 }
 
 func (u *udpConnImpl) LocalAddr() net.Addr {
@@ -129,8 +159,14 @@ func (u *udpConnImpl) RemoteAddr() net.Addr {
 	return u.conn.RemoteAddr()
 }
 
-func (u *udpConnImpl) SetSecretKey(secretKey [32]byte) {
-	u.secretKey = secretKey
+func (u *udpConnImpl) SetSecretKey(encryptionMode EncryptionMode, secretKey []byte) error {
+	e, err := NewEncrypter(encryptionMode, secretKey)
+	if err != nil {
+		return fmt.Errorf("failed to create encrypter: %w", err)
+	}
+
+	u.encrypter = e
+	return nil
 }
 
 func (u *udpConnImpl) SetDeadline(t time.Time) error {
@@ -199,41 +235,52 @@ func (u *udpConnImpl) Open(ctx context.Context, ip string, port int, ssrc uint32
 	}
 
 	returnedSSRC := binary.BigEndian.Uint32(rb[4:8])   // ssrc
-	ourAddress := strings.TrimSpace(string(rb[8:72]))  // our ip
+	ourAddress := string(bytes.Trim(rb[8:72], "\x00")) // our ip (null-padded)
 	ourPort := int(binary.BigEndian.Uint16(rb[72:74])) // our port
 
 	if returnedSSRC != ssrc {
 		return "", 0, fmt.Errorf("invalid ssrc in ip discovery response")
 	}
 
-	u.packet = [12]byte{
-		0: 0x80, // Version + Flags
-		1: 0x78, // Payload Type
-		// [2:4] // Sequence
-		// [4:8] // Timestamp
-	}
+	u.header[0] = RTPVersionPadExtend // Version + Flags
+	u.header[1] = RTPPayloadType      // Payload Type
+	// [2:4]  // Sequence
+	// [4:8]  // Timestamp
+	// [8:12] // SSRC
 
-	binary.BigEndian.PutUint32(u.packet[8:12], ssrc) // SSRC
+	binary.BigEndian.PutUint32(u.header[8:], ssrc) // SSRC
+
+	u.ssrc = ssrc
+	u.daveSession.AssignSsrcToCodec(ssrc, godave.CodecOpus)
 
 	return ourAddress, ourPort, nil
 }
 
 func (u *udpConnImpl) Write(p []byte) (int, error) {
-	binary.BigEndian.PutUint16(u.packet[2:4], u.sequence)
-	u.sequence++
-
-	binary.BigEndian.PutUint32(u.packet[4:8], u.timestamp)
-	u.timestamp += 960
-
-	// Copy the first 12 bytes from the packet into the nonce.
-	copy(u.nonce[:12], u.packet[:])
-
 	u.connMu.Lock()
 	conn := u.conn
 	u.connMu.Unlock()
-	if _, err := conn.Write(secretbox.Seal(u.packet[:], p, &u.nonce, &u.secretKey)); err != nil {
+
+	binary.BigEndian.PutUint16(u.header[2:4], u.sequence)
+	u.sequence++
+
+	binary.BigEndian.PutUint32(u.header[4:8], u.timestamp)
+	u.timestamp += OpusFrameSize
+
+	bufferCap := u.daveSession.MaxEncryptedFrameSize(len(p))
+	if cap(u.encryptBuffer) < bufferCap {
+		u.encryptBuffer = slices.Grow(u.encryptBuffer, bufferCap)
+	}
+
+	n, err := u.daveSession.Encrypt(u.ssrc, p, u.encryptBuffer)
+	if err != nil {
+		return 0, fmt.Errorf("failed to encrypt packet: %w", err)
+	}
+
+	if _, err = conn.Write(u.encrypter.Encrypt(u.header, u.encryptBuffer[:n])); err != nil {
 		return 0, fmt.Errorf("failed to write packet: %w", err)
 	}
+
 	return len(p), nil
 }
 
@@ -251,38 +298,100 @@ func (u *udpConnImpl) ReadPacket() (*Packet, error) {
 	u.connMu.Unlock()
 
 	for {
-		i, err := conn.Read(u.receiveBuffer)
+		n, err := conn.Read(u.receiveBuffer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read packet: %w", err)
 		}
-		if i < OpusPacketHeaderSize || (u.receiveBuffer[0] != 0x80 && u.receiveBuffer[0] != 0x90) || (u.receiveBuffer[1] != 0x78 && u.receiveBuffer[1] != 0x80) {
+
+		if n < RTPHeaderSize {
 			continue
 		}
 
-		copy(u.receiveNonce[:], u.receiveBuffer[0:OpusPacketHeaderSize])
-
-		opus, ok := secretbox.Open(nil, u.receiveBuffer[OpusPacketHeaderSize:i], &u.receiveNonce, &u.secretKey)
-		if !ok {
-			return nil, ErrDecryptionFailed
+		packetType := u.receiveBuffer[1]
+		if packetType != RTPPayloadType {
+			// ignore non-voice packets
+			continue
 		}
 
-		isExtension := u.receiveBuffer[0]&0x10 == 0x10
-		isMarker := u.receiveBuffer[1]&0x80 != 0x0
-
-		if isExtension && !isMarker {
-			extLen := binary.BigEndian.Uint16(opus[2:4])
-			shift := 4 + 4*int(extLen)
-
-			if len(opus) > shift {
-				opus = opus[shift:]
+		hasPadding := (u.receiveBuffer[0] & 0x04) != 0
+		if hasPadding {
+			paddingLen := int(u.receiveBuffer[n-1])
+			if paddingLen <= 0 || paddingLen > n-RTPHeaderSize {
+				continue
 			}
+			n -= paddingLen
 		}
-		return &Packet{
-			Sequence:  binary.BigEndian.Uint16(u.receiveBuffer[2:4]),
-			Timestamp: binary.BigEndian.Uint32(u.receiveBuffer[4:8]),
-			SSRC:      binary.BigEndian.Uint32(u.receiveBuffer[8:12]),
-			Opus:      opus,
-		}, nil
+
+		p := Packet{
+			Type:         packetType,
+			Sequence:     binary.BigEndian.Uint16(u.receiveBuffer[2:4]),
+			Timestamp:    binary.BigEndian.Uint32(u.receiveBuffer[4:8]),
+			SSRC:         binary.BigEndian.Uint32(u.receiveBuffer[8:RTPHeaderSize]),
+			HasExtension: (u.receiveBuffer[0] & 0x10) != 0,
+			ExtensionID:  0,
+			Extension:    nil,
+			CSRC:         nil,
+			HeaderSize:   0,
+			Opus:         nil,
+		}
+
+		cc := int(u.receiveBuffer[0] & 0x0F)
+		headerLen := RTPHeaderSize + (4 * cc)
+		if n < headerLen {
+			continue
+		}
+
+		p.CSRC = make([]uint32, cc)
+		for i := range cc {
+			p.CSRC[i] = binary.BigEndian.Uint32(u.receiveBuffer[RTPHeaderSize+i*4 : RTPHeaderSize+i*4+4])
+		}
+
+		var extensionLenWords uint16
+		if p.HasExtension {
+			if n < headerLen+4 {
+				continue
+			}
+			p.ExtensionID = int(binary.BigEndian.Uint16(u.receiveBuffer[headerLen : headerLen+2]))
+			extensionLenWords = binary.BigEndian.Uint16(u.receiveBuffer[headerLen+2 : headerLen+4])
+			headerLen += 4
+		}
+
+		p.HeaderSize = headerLen
+		if n < p.HeaderSize+4 {
+			continue
+		}
+
+		decrypted, err := u.encrypter.Decrypt(p.HeaderSize, u.receiveBuffer[:n])
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt packet: %w", err)
+		}
+
+		var decryptedOffset int
+		if p.HasExtension {
+			extensionLen := int(extensionLenWords) * 4
+			if decryptedOffset+extensionLen > len(decrypted) {
+				continue
+			}
+			p.Extension = decrypted[decryptedOffset : decryptedOffset+extensionLen]
+			decryptedOffset += extensionLen
+		}
+
+		decrypted = decrypted[decryptedOffset:]
+
+		userID := godave.UserID(u.ssrcLookup(p.SSRC).String())
+		bufferCap := u.daveSession.MaxDecryptedFrameSize(userID, len(decrypted))
+		if cap(u.decryptBuffer) < bufferCap {
+			u.decryptBuffer = slices.Grow(u.decryptBuffer, bufferCap)
+		}
+
+		n, err = u.daveSession.Decrypt(userID, decrypted, u.decryptBuffer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to DAVE decrypt packet: %w", err)
+		}
+
+		p.Opus = u.decryptBuffer[:n]
+
+		return &p, nil
 	}
 }
 

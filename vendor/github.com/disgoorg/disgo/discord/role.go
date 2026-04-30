@@ -3,7 +3,7 @@ package discord
 import (
 	"time"
 
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 )
 
@@ -16,6 +16,7 @@ type Role struct {
 	Name        string       `json:"name"`
 	Description *string      `json:"description,omitempty"`
 	Color       int          `json:"color"`
+	RoleColors  RoleColors   `json:"colors"`
 	Hoist       bool         `json:"hoist"`
 	Position    int          `json:"position"`
 	Permissions Permissions  `json:"permissions"`
@@ -26,6 +27,8 @@ type Role struct {
 	Tags        *RoleTag     `json:"tags,omitempty"`
 	Flags       RoleFlags    `json:"flags"`
 }
+
+func (Role) isMentionableValue() {}
 
 func (r Role) String() string {
 	return RoleMention(r.ID)
@@ -45,6 +48,12 @@ func (r Role) IconURL(opts ...CDNOpt) *string {
 
 func (r Role) CreatedAt() time.Time {
 	return r.ID.Time()
+}
+
+type RoleColors struct {
+	PrimaryColor   int  `json:"primary_color"`
+	SecondaryColor *int `json:"secondary_color"`
+	TertiaryColor  *int `json:"tertiary_color"`
 }
 
 // RoleTag are tags a Role has
@@ -69,6 +78,7 @@ type RoleCreate struct {
 	Name        string       `json:"name,omitempty"`
 	Permissions *Permissions `json:"permissions,omitempty"`
 	Color       int          `json:"color,omitempty"`
+	Colors      RoleColors   `json:"colors,omitempty"`
 	Hoist       bool         `json:"hoist,omitempty"`
 	Icon        *Icon        `json:"icon,omitempty"`
 	Emoji       string       `json:"unicode_emoji,omitempty"`
@@ -77,13 +87,14 @@ type RoleCreate struct {
 
 // RoleUpdate is the payload to update a Role
 type RoleUpdate struct {
-	Name        *string              `json:"name,omitempty"`
-	Permissions *Permissions         `json:"permissions,omitempty"`
-	Color       *int                 `json:"color,omitempty"`
-	Hoist       *bool                `json:"hoist,omitempty"`
-	Icon        *json.Nullable[Icon] `json:"icon,omitempty"`
-	Emoji       *string              `json:"unicode_emoji,omitempty"`
-	Mentionable *bool                `json:"mentionable,omitempty"`
+	Name        *string                `json:"name,omitempty"`
+	Permissions *Permissions           `json:"permissions,omitempty"`
+	Color       *int                   `json:"color,omitempty"`
+	Colors      omit.Omit[*RoleColors] `json:"colors,omitzero"`
+	Hoist       *bool                  `json:"hoist,omitempty"`
+	Icon        omit.Omit[*Icon]       `json:"icon,omitzero"`
+	Emoji       *string                `json:"unicode_emoji,omitempty"`
+	Mentionable *bool                  `json:"mentionable,omitempty"`
 }
 
 // RolePositionUpdate is the payload to update a Role(s) position

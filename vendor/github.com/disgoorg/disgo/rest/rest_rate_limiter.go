@@ -31,22 +31,20 @@ type RateLimiter interface {
 	// Reset resets the rate limiter to its initial state
 	Reset()
 
-	// WaitBucket waits for the given bucket to be available for new requests & locks it
-	WaitBucket(ctx context.Context, endpoint *CompiledEndpoint) error
+	// Wait waits for the given bucket to be available for new requests & locks it
+	Wait(ctx context.Context, endpoint *CompiledEndpoint) error
 
-	// UnlockBucket unlocks the given bucket and calculates the rate limit for the next request
-	UnlockBucket(endpoint *CompiledEndpoint, rs *http.Response) error
+	// Unlock unlocks the given bucket and calculates the rate limit for the next request
+	Unlock(endpoint *CompiledEndpoint, rs *http.Response) error
 }
 
 // NewRateLimiter return a new default RateLimiter with the given RateLimiterConfigOpt(s).
 func NewRateLimiter(opts ...RateLimiterConfigOpt) RateLimiter {
-	config := DefaultRateLimiterConfig()
-	config.Apply(opts)
-	config.Logger = config.Logger.With(slog.String("name", "rest_rate_limiter"))
+	cfg := defaultRateLimiterConfig()
+	cfg.apply(opts)
 
 	rateLimiter := &rateLimiterImpl{
-		config:  *config,
-		hashes:  map[*Endpoint]string{},
+		config:  cfg,
 		buckets: map[string]*bucket{},
 	}
 
@@ -55,21 +53,16 @@ func NewRateLimiter(opts ...RateLimiterConfigOpt) RateLimiter {
 	return rateLimiter
 }
 
-type (
-	rateLimiterImpl struct {
-		config RateLimiterConfig
+type rateLimiterImpl struct {
+	config rateLimiterConfig
 
-		// global Rate Limit
-		global time.Time
+	// global Rate Limit
+	global time.Time
 
-		// APIRoute -> Hash
-		hashes   map[*Endpoint]string
-		hashesMu sync.Mutex
-		// Hash + Major Parameter -> bucket
-		buckets   map[string]*bucket
-		bucketsMu sync.Mutex
-	}
-)
+	// Hash + Major Parameter -> bucket
+	buckets   map[string]*bucket
+	bucketsMu sync.Mutex
+}
 
 func (l *rateLimiterImpl) MaxRetries() int {
 	return l.config.MaxRetries
@@ -104,6 +97,7 @@ func (l *rateLimiterImpl) doCleanup() {
 
 func (l *rateLimiterImpl) Close(ctx context.Context) {
 	var wg sync.WaitGroup
+	l.bucketsMu.Lock()
 	for i := range l.buckets {
 		wg.Add(1)
 		b := l.buckets[i]
@@ -116,22 +110,16 @@ func (l *rateLimiterImpl) Close(ctx context.Context) {
 }
 
 func (l *rateLimiterImpl) Reset() {
-	l.buckets = map[string]*bucket{}
-	l.bucketsMu = sync.Mutex{}
+	l.bucketsMu.Lock()
+	defer l.bucketsMu.Unlock()
+
 	l.global = time.Time{}
-	l.hashes = map[*Endpoint]string{}
-	l.hashesMu = sync.Mutex{}
+	clear(l.buckets)
 }
 
 func (l *rateLimiterImpl) getRouteHash(endpoint *CompiledEndpoint) string {
-	l.hashesMu.Lock()
-	hash, ok := l.hashes[endpoint.Endpoint]
-	if !ok {
-		// generate routeHash
-		hash = endpoint.Endpoint.Method + "+" + endpoint.Endpoint.Route
-		l.hashes[endpoint.Endpoint] = hash
-	}
-	l.hashesMu.Unlock()
+	hash := endpoint.Endpoint.Method + "+" + endpoint.Endpoint.Route
+
 	if endpoint.MajorParams != "" {
 		hash += "+" + endpoint.MajorParams
 	}
@@ -163,7 +151,7 @@ func (l *rateLimiterImpl) getBucket(endpoint *CompiledEndpoint, create bool) *bu
 	return b
 }
 
-func (l *rateLimiterImpl) WaitBucket(ctx context.Context, endpoint *CompiledEndpoint) error {
+func (l *rateLimiterImpl) Wait(ctx context.Context, endpoint *CompiledEndpoint) error {
 	b := l.getBucket(endpoint, true)
 	l.config.Logger.Debug("locking rest bucket", slog.String("id", b.ID), slog.Int("limit", b.Limit), slog.Int("remaining", b.Remaining), slog.Time("reset", b.Reset))
 	if err := b.mu.CLock(ctx); err != nil {
@@ -182,6 +170,7 @@ func (l *rateLimiterImpl) WaitBucket(ctx context.Context, endpoint *CompiledEndp
 	if until.After(now) {
 		// TODO: do we want to return early when we know the rate limit bigger than ctx deadline?
 		if deadline, ok := ctx.Deadline(); ok && until.After(deadline) {
+			b.mu.Unlock()
 			return context.DeadlineExceeded
 		}
 
@@ -195,7 +184,7 @@ func (l *rateLimiterImpl) WaitBucket(ctx context.Context, endpoint *CompiledEndp
 	return nil
 }
 
-func (l *rateLimiterImpl) UnlockBucket(endpoint *CompiledEndpoint, rs *http.Response) error {
+func (l *rateLimiterImpl) Unlock(endpoint *CompiledEndpoint, rs *http.Response) error {
 	b := l.getBucket(endpoint, false)
 	if b == nil {
 		return nil

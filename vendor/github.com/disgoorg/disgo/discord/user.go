@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/disgoorg/disgo/internal/flags"
@@ -37,7 +37,6 @@ const (
 	UserFlagBotHTTPInteractions
 	_
 	_
-	UserFlagActiveDeveloper
 	UserFlagsNone UserFlags = 0
 )
 
@@ -76,7 +75,11 @@ type User struct {
 	System               bool                  `json:"system"`
 	PublicFlags          UserFlags             `json:"public_flags"`
 	AvatarDecorationData *AvatarDecorationData `json:"avatar_decoration_data"`
+	Collectibles         *Collectibles         `json:"collectibles"`
+	PrimaryGuild         *PrimaryGuild         `json:"primary_guild"`
 }
+
+func (User) isMentionableValue() {}
 
 // String returns a mention of the user
 func (u User) String() string {
@@ -149,6 +152,15 @@ func (u User) AvatarDecorationURL(opts ...CDNOpt) *string {
 	return &url
 }
 
+// GuildTagURL returns the server tag badge URL if the user has a primary discord.Guild or nil
+func (u User) GuildTagURL(opts ...CDNOpt) *string {
+	if u.PrimaryGuild == nil {
+		return nil
+	}
+	url := formatAssetURL(GuildTagBadge, opts, u.PrimaryGuild.IdentityGuildID, u.PrimaryGuild.Badge)
+	return &url
+}
+
 func (u User) CreatedAt() time.Time {
 	return u.ID.Time()
 }
@@ -180,9 +192,9 @@ const (
 
 // UserUpdate is the payload used to update the OAuth2User
 type UserUpdate struct {
-	Username string               `json:"username,omitempty"`
-	Avatar   *json.Nullable[Icon] `json:"avatar,omitempty"`
-	Banner   *json.Nullable[Icon] `json:"banner,omitempty"`
+	Username string           `json:"username,omitempty"`
+	Avatar   omit.Omit[*Icon] `json:"avatar,omitzero"`
+	Banner   omit.Omit[*Icon] `json:"banner,omitzero"`
 }
 
 type ApplicationRoleConnection struct {
@@ -200,4 +212,42 @@ type ApplicationRoleConnectionUpdate struct {
 type AvatarDecorationData struct {
 	Asset string       `json:"asset"`
 	SkuID snowflake.ID `json:"sku_id"`
+}
+
+type Collectibles struct {
+	Nameplate *Nameplate `json:"nameplate"`
+}
+
+type Nameplate struct {
+	SkuID   snowflake.ID     `json:"sku_id"`
+	Asset   string           `json:"asset"`
+	Label   string           `json:"label"`
+	Palette NameplatePalette `json:"palette"`
+}
+
+func (n Nameplate) AssetURL(opts ...CDNOpt) string {
+	return formatAssetURL(NameplateAsset, opts, n.Asset)
+}
+
+type NameplatePalette string
+
+const (
+	NameplatePaletteBerry     NameplatePalette = "berry"
+	NameplatePaletteBubbleGum NameplatePalette = "bubble_gum"
+	NameplatePaletteClover    NameplatePalette = "clover"
+	NameplatePaletteCobalt    NameplatePalette = "cobalt"
+	NameplatePaletteCrimson   NameplatePalette = "crimson"
+	NameplatePaletteForest    NameplatePalette = "forest"
+	NameplatePaletteLemon     NameplatePalette = "lemon"
+	NameplatePaletteSky       NameplatePalette = "sky"
+	NameplatePaletteTeal      NameplatePalette = "teal"
+	NameplatePaletteViolet    NameplatePalette = "violet"
+	NameplatePaletteWhite     NameplatePalette = "white"
+)
+
+type PrimaryGuild struct {
+	IdentityGuildID *snowflake.ID `json:"identity_guild_id"`
+	IdentityEnabled *bool         `json:"identity_enabled"`
+	Tag             *string       `json:"tag"`
+	Badge           *string       `json:"badge"`
 }

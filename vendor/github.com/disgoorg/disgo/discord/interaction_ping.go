@@ -3,7 +3,7 @@ package discord
 import (
 	"time"
 
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/json/v2"
 	"github.com/disgoorg/snowflake/v2"
 )
 
@@ -109,6 +109,10 @@ func (PingInteraction) AuthorizingIntegrationOwners() map[ApplicationIntegration
 }
 
 func (PingInteraction) Context() InteractionContextType {
+	return 0
+}
+
+func (PingInteraction) AttachmentSizeLimit() int {
 	return 0
 }
 

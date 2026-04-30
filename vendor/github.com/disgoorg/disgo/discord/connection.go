@@ -17,7 +17,9 @@ type ConnectionType string
 const (
 	ConnectionTypeAmazonMusic        ConnectionType = "amazon-music"
 	ConnectionTypeBattleNet          ConnectionType = "battlenet"
+	ConnectionTypeBluesky            ConnectionType = "bluesky"
 	ConnectionTypeBungie             ConnectionType = "bungie"
+	ConnectionTypeCrunchyroll        ConnectionType = "crunchyroll"
 	ConnectionTypeDomain             ConnectionType = "domain"
 	ConnectionTypeEbay               ConnectionType = "ebay"
 	ConnectionTypeEpicGames          ConnectionType = "epicgames"
@@ -25,6 +27,7 @@ const (
 	ConnectionTypeGitHub             ConnectionType = "github"
 	ConnectionTypeInstagram          ConnectionType = "instagram"
 	ConnectionTypeLeagueOfLegends    ConnectionType = "leagueoflegends"
+	ConnectionTypeMastodon           ConnectionType = "mastodon"
 	ConnectionTypePayPal             ConnectionType = "paypal"
 	ConnectionTypePlayStationNetwork ConnectionType = "playstation"
 	ConnectionTypeReddit             ConnectionType = "reddit"

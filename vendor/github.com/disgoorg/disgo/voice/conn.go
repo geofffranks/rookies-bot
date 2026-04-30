@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/disgoorg/godave"
 	"github.com/disgoorg/snowflake/v2"
 
 	botgateway "github.com/disgoorg/disgo/gateway"
@@ -60,12 +61,11 @@ type (
 
 // NewConn returns a new default voice conn.
 func NewConn(guildID snowflake.ID, userID snowflake.ID, voiceStateUpdateFunc StateUpdateFunc, removeConnFunc func(), opts ...ConnConfigOpt) Conn {
-	config := DefaultConnConfig()
-	config.Apply(opts)
-	config.Logger = config.Logger.With(slog.String("name", "voice_conn"))
+	cfg := defaultConnConfig()
+	cfg.apply(opts)
 
 	conn := &connImpl{
-		config:               *config,
+		config:               cfg,
 		voiceStateUpdateFunc: voiceStateUpdateFunc,
 		removeConnFunc:       removeConnFunc,
 		state: State{
@@ -77,14 +77,15 @@ func NewConn(guildID snowflake.ID, userID snowflake.ID, voiceStateUpdateFunc Sta
 		ssrcs:      map[uint32]snowflake.ID{},
 	}
 
-	conn.gateway = config.GatewayCreateFunc(conn.handleMessage, conn.handleGatewayClose, append([]GatewayConfigOpt{WithGatewayLogger(config.Logger)}, config.GatewayConfigOpts...)...)
-	conn.udp = config.UDPConnCreateFunc(append([]UDPConnConfigOpt{WithUDPConnLogger(config.Logger)}, config.UDPConnConfigOpts...)...)
+	daveSession := cfg.DaveSessionCreate(cfg.DaveSessionLogger, godave.UserID(userID.String()), conn)
+	conn.gateway = cfg.GatewayCreateFunc(daveSession, conn.handleMessage, conn.handleGatewayClose, append([]GatewayConfigOpt{WithGatewayLogger(cfg.Logger)}, cfg.GatewayConfigOpts...)...)
+	conn.udp = cfg.UDPConnCreateFunc(daveSession, conn.UserIDBySSRC, append([]UDPConnConfigOpt{WithUDPConnLogger(cfg.Logger)}, cfg.UDPConnConfigOpts...)...)
 
 	return conn
 }
 
 type connImpl struct {
-	config               ConnConfig
+	config               connConfig
 	voiceStateUpdateFunc StateUpdateFunc
 	removeConnFunc       func()
 
@@ -102,6 +103,22 @@ type connImpl struct {
 
 	ssrcs   map[uint32]snowflake.ID
 	ssrcsMu sync.Mutex
+}
+
+func (c *connImpl) SendMLSKeyPackage(mlsKeyPackage []byte) error {
+	return c.gateway.Send(context.Background(), OpcodeDaveMLSKeyPackage, GatewayMessageDataDaveMLSKeyPackage(mlsKeyPackage))
+}
+
+func (c *connImpl) SendMLSCommitWelcome(mlsCommitWelcome []byte) error {
+	return c.gateway.Send(context.Background(), OpcodeDaveMLSCommitWelcome, GatewayMessageDataDaveMLSCommitWelcome(mlsCommitWelcome))
+}
+
+func (c *connImpl) SendReadyForTransition(transitionID uint16) error {
+	return c.gateway.Send(context.Background(), OpcodeDaveTransitionReady, GatewayMessageDataDaveProtocolReadyForTransition{TransitionID: transitionID})
+}
+
+func (c *connImpl) SendInvalidCommitWelcome(transitionID uint16) error {
+	return c.gateway.Send(context.Background(), OpcodeDaveMLSInvalidCommitWelcome, GatewayMessageDataDaveInvalidCommitWelcome{TransitionID: transitionID})
 }
 
 func (c *connImpl) ChannelID() *snowflake.ID {
@@ -195,7 +212,7 @@ func (c *connImpl) HandleVoiceServerUpdate(update botgateway.EventVoiceServerUpd
 	}()
 }
 
-func (c *connImpl) handleMessage(op Opcode, data GatewayMessageData) {
+func (c *connImpl) handleMessage(gateway Gateway, op Opcode, sequenceNumber int, data GatewayMessageData) {
 	switch d := data.(type) {
 	case GatewayMessageDataReady:
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -205,19 +222,28 @@ func (c *connImpl) handleMessage(op Opcode, data GatewayMessageData) {
 			c.config.Logger.Error("voice: failed to open voiceudp conn", slog.Any("err", err))
 			break
 		}
+
+		encryptionMode, err := ChooseEncryptionMode(d.Modes)
+		if err != nil {
+			c.config.Logger.Error("voice: failed to choose encryption mode", slog.Any("err", err))
+			break
+		}
+
 		if err = c.Gateway().Send(ctx, OpcodeSelectProtocol, GatewayMessageDataSelectProtocol{
 			Protocol: ProtocolUDP,
 			Data: GatewayMessageDataSelectProtocolData{
 				Address: ourAddress,
 				Port:    ourPort,
-				Mode:    EncryptionModeNormal,
+				Mode:    encryptionMode,
 			},
 		}); err != nil {
 			c.config.Logger.Error("voice: failed to send select protocol", slog.Any("err", err))
 		}
 
 	case GatewayMessageDataSessionDescription:
-		c.udp.SetSecretKey(d.SecretKey)
+		if err := c.udp.SetSecretKey(d.Mode, d.SecretKey); err != nil {
+			c.config.Logger.Error("voice: failed to set secret key", slog.Any("err", err))
+		}
 		c.openedChan <- struct{}{}
 
 	case GatewayMessageDataSpeaking:
@@ -239,11 +265,11 @@ func (c *connImpl) handleMessage(op Opcode, data GatewayMessageData) {
 		}
 	}
 	if c.config.EventHandlerFunc != nil {
-		c.config.EventHandlerFunc(op, data)
+		c.config.EventHandlerFunc(gateway, op, sequenceNumber, data)
 	}
 }
 
-func (c *connImpl) handleGatewayClose(_ Gateway, _ error) {
+func (c *connImpl) handleGatewayClose(_ Gateway, _ error, _ bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c.Close(ctx)
@@ -267,7 +293,9 @@ func (c *connImpl) Open(ctx context.Context, channelID snowflake.ID, selfMute bo
 func (c *connImpl) Close(ctx context.Context) {
 	_ = c.voiceStateUpdateFunc(ctx, c.state.GuildID, nil, false, false)
 	defer c.gateway.Close()
-	defer c.udp.Close()
+	defer func() {
+		_ = c.udp.Close()
+	}()
 
 	select {
 	case _, ok := <-c.closedChan:

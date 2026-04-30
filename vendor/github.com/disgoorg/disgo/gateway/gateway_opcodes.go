@@ -17,6 +17,7 @@ const (
 	OpcodeInvalidSession
 	OpcodeHello
 	OpcodeHeartbeatACK
+	OpcodeRequestSoundboardSounds Opcode = 31
 )
 
 type CloseEventCode struct {
@@ -143,6 +144,7 @@ var (
 		CloseEventCodeRateLimited.Code:          CloseEventCodeRateLimited,
 		CloseEventCodeSessionTimed.Code:         CloseEventCodeSessionTimed,
 		CloseEventCodeInvalidShard.Code:         CloseEventCodeInvalidShard,
+		CloseEventCodeShardingRequired.Code:     CloseEventCodeShardingRequired,
 		CloseEventCodeInvalidAPIVersion.Code:    CloseEventCodeInvalidAPIVersion,
 		CloseEventCodeInvalidIntent.Code:        CloseEventCodeInvalidIntent,
 		CloseEventCodeDisallowedIntent.Code:     CloseEventCodeDisallowedIntent,

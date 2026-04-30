@@ -1,12 +1,13 @@
 package rest
 
 import (
+	"context"
 	"time"
 
-	"github.com/disgoorg/disgo/internal/slicehelper"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/internal/slicehelper"
 )
 
 var _ Guilds = (*guildImpl)(nil)
@@ -18,9 +19,7 @@ func NewGuilds(client Client) Guilds {
 type Guilds interface {
 	GetGuild(guildID snowflake.ID, withCounts bool, opts ...RequestOpt) (*discord.RestGuild, error)
 	GetGuildPreview(guildID snowflake.ID, opts ...RequestOpt) (*discord.GuildPreview, error)
-	CreateGuild(guildCreate discord.GuildCreate, opts ...RequestOpt) (*discord.RestGuild, error)
 	UpdateGuild(guildID snowflake.ID, guildUpdate discord.GuildUpdate, opts ...RequestOpt) (*discord.RestGuild, error)
-	DeleteGuild(guildID snowflake.ID, opts ...RequestOpt) error
 
 	GetGuildVanityURL(guildID snowflake.ID, opts ...RequestOpt) (*discord.PartialInvite, error)
 
@@ -34,6 +33,7 @@ type Guilds interface {
 	UpdateRole(guildID snowflake.ID, roleID snowflake.ID, roleUpdate discord.RoleUpdate, opts ...RequestOpt) (*discord.Role, error)
 	UpdateRolePositions(guildID snowflake.ID, rolePositionUpdates []discord.RolePositionUpdate, opts ...RequestOpt) ([]discord.Role, error)
 	DeleteRole(guildID snowflake.ID, roleID snowflake.ID, opts ...RequestOpt) error
+	GetRoleMemberCounts(guildID snowflake.ID, opts ...RequestOpt) (map[snowflake.ID]int, error)
 
 	GetBans(guildID snowflake.ID, before snowflake.ID, after snowflake.ID, limit int, opts ...RequestOpt) ([]discord.Ban, error)
 	GetBansPage(guildID snowflake.ID, startID snowflake.ID, limit int, opts ...RequestOpt) Page[discord.Ban]
@@ -60,6 +60,10 @@ type Guilds interface {
 
 	GetGuildOnboarding(guildID snowflake.ID, opts ...RequestOpt) (*discord.GuildOnboarding, error)
 	UpdateGuildOnboarding(guildID snowflake.ID, onboardingUpdate discord.GuildOnboardingUpdate, opts ...RequestOpt) (*discord.GuildOnboarding, error)
+
+	UpdateGuildIncidentActions(guildID snowflake.ID, actionsUpdate discord.GuildIncidentActionsUpdate, opts ...RequestOpt) (*discord.GuildIncidentsData, error)
+
+	SearchGuildMessages(ctx context.Context, guildID snowflake.ID, query discord.GuildMessagesSearch, opts ...RequestOpt) (*discord.GuildMessagesSearchResult, error)
 }
 
 type guildImpl struct {
@@ -79,18 +83,9 @@ func (s *guildImpl) GetGuildPreview(guildID snowflake.ID, opts ...RequestOpt) (g
 	return
 }
 
-func (s *guildImpl) CreateGuild(guildCreate discord.GuildCreate, opts ...RequestOpt) (guild *discord.RestGuild, err error) {
-	err = s.client.Do(CreateGuild.Compile(nil), guildCreate, &guild, opts...)
-	return
-}
-
 func (s *guildImpl) UpdateGuild(guildID snowflake.ID, guildUpdate discord.GuildUpdate, opts ...RequestOpt) (guild *discord.RestGuild, err error) {
 	err = s.client.Do(UpdateGuild.Compile(nil, guildID), guildUpdate, &guild, opts...)
 	return
-}
-
-func (s *guildImpl) DeleteGuild(guildID snowflake.ID, opts ...RequestOpt) error {
-	return s.client.Do(DeleteGuild.Compile(nil, guildID), nil, nil, opts...)
 }
 
 func (s *guildImpl) GetGuildVanityURL(guildID snowflake.ID, opts ...RequestOpt) (partialInvite *discord.PartialInvite, err error) {
@@ -171,6 +166,11 @@ func (s *guildImpl) DeleteRole(guildID snowflake.ID, roleID snowflake.ID, opts .
 	return s.client.Do(DeleteRole.Compile(nil, guildID, roleID), nil, nil, opts...)
 }
 
+func (s *guildImpl) GetRoleMemberCounts(guildID snowflake.ID, opts ...RequestOpt) (memberCounts map[snowflake.ID]int, err error) {
+	err = s.client.Do(GetRoleMemberCounts.Compile(nil, guildID), nil, &memberCounts, opts...)
+	return
+}
+
 func (s *guildImpl) GetBans(guildID snowflake.ID, before snowflake.ID, after snowflake.ID, limit int, opts ...RequestOpt) (bans []discord.Ban, err error) {
 	values := discord.QueryValues{}
 	if before != 0 {
@@ -227,8 +227,10 @@ func (s *guildImpl) DeleteIntegration(guildID snowflake.ID, integrationID snowfl
 
 func (s *guildImpl) GetGuildPruneCount(guildID snowflake.ID, days int, includeRoles []snowflake.ID, opts ...RequestOpt) (result *discord.GuildPruneResult, err error) {
 	values := discord.QueryValues{
-		"days":          days,
-		"include_roles": slicehelper.JoinSnowflakes(includeRoles),
+		"days": days,
+	}
+	if len(includeRoles) > 0 {
+		values["include_roles"] = slicehelper.JoinSnowflakes(includeRoles)
 	}
 	err = s.client.Do(GetGuildPruneCount.Compile(values, guildID), nil, &result, opts...)
 	return
@@ -309,4 +311,42 @@ func (s *guildImpl) GetGuildOnboarding(guildID snowflake.ID, opts ...RequestOpt)
 func (s *guildImpl) UpdateGuildOnboarding(guildID snowflake.ID, onboardingUpdate discord.GuildOnboardingUpdate, opts ...RequestOpt) (guildOnboarding *discord.GuildOnboarding, err error) {
 	err = s.client.Do(UpdateGuildOnboarding.Compile(nil, guildID), onboardingUpdate, &guildOnboarding, opts...)
 	return
+}
+
+func (s *guildImpl) UpdateGuildIncidentActions(guildID snowflake.ID, actionsUpdate discord.GuildIncidentActionsUpdate, opts ...RequestOpt) (incidentsData *discord.GuildIncidentsData, err error) {
+	err = s.client.Do(UpdateGuildIncidentActions.Compile(nil, guildID), actionsUpdate, &incidentsData, opts...)
+	return
+}
+
+// SearchGuildMessages searches for messages in a guild matching the given query.
+// Returns a list of Messages without the Reactions field that match a search query in the guild. Requires the READ_MESSAGE_HISTORY permission.
+// Note: The Search Guild Messages endpoint is restricted according to whether the MESSAGE_CONTENT Privileged Intent is enabled for your application.
+//
+// If the entity you are searching is not yet indexed, the endpoint will return a 202 accepted response. The response body will not contain any search results, and will look similar to an error response.
+// You should retry the request after the timeframe specified in the RetryAfter field. If the RetryAfter field is 0, you should retry the request after a short delay.
+//
+// Due to speed optimizations, search may return slightly fewer results than the limit specified when messages have not been accessed for a long time.
+// Clients should not rely on the length of the `Messages` slice to paginate results.
+//
+// Additionally, when messages are actively being created or deleted, the `TotalResults` field may not be accurate.
+func (s *guildImpl) SearchGuildMessages(ctx context.Context, guildID snowflake.ID, query discord.GuildMessagesSearch, opts ...RequestOpt) (*discord.GuildMessagesSearchResult, error) {
+	opts = append([]RequestOpt{WithCtx(ctx)}, opts...)
+	for {
+		var result discord.GuildMessagesSearchResult
+		if err := s.client.Do(SearchGuildMessages.Compile(query.ToQueryValues(), guildID), nil, &result, opts...); err != nil {
+			return nil, err
+		}
+		if result.Code != int(JSONErrorCodeIndexNotYetAvailable) {
+			return &result, nil
+		}
+		retryAfter := time.Duration(result.RetryAfter) * time.Second
+		if retryAfter <= 0 {
+			retryAfter = time.Second
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(retryAfter):
+		}
+	}
 }
