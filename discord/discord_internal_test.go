@@ -81,6 +81,24 @@ var _ = Describe("isAllowedUser", func() {
 	})
 })
 
+var _ = Describe("helpMessage", func() {
+	It("lists the !help command", func() {
+		Expect(helpMessage()).To(ContainSubstring("!help"))
+	})
+
+	It("lists the !announce-penalties command", func() {
+		Expect(helpMessage()).To(ContainSubstring("!announce-penalties"))
+	})
+
+	It("lists the !race-setup command", func() {
+		Expect(helpMessage()).To(ContainSubstring("!race-setup"))
+	})
+
+	It("notes that the penalty commands require a YAML attachment", func() {
+		Expect(helpMessage()).To(ContainSubstring("YAML"))
+	})
+})
+
 var _ = Describe("buildPenalizedDriverList", func() {
 	var driverLookup models.DriverLookup
 

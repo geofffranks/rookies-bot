@@ -193,11 +193,25 @@ func (d *DiscordClient) onMessageCreate(event *events.MessageCreate) {
 	}
 
 	switch event.Message.Content {
+	case "!help":
+		sendBotResponse(event, helpMessage(), "")
 	case "!announce-penalties":
 		d.announcePenalties(event)
 	case "!race-setup":
 		d.raceSetup(event)
 	}
+}
+
+// helpMessage returns the admin-facing command reference posted in response
+// to the !help command.
+func helpMessage() string {
+	return "**Rookies Bot — Commands**\n\n" +
+		"`!help`\n" +
+		"  Show this message.\n\n" +
+		"`!announce-penalties`\n" +
+		"  Attach a round penalty YAML; posts the formatted penalty breakdown (quali bans / pit starts, R1 & R2).\n\n" +
+		"`!race-setup`\n" +
+		"  Attach a round penalty YAML; generates the next round config and race-day setup.\n"
 }
 
 func sendBotResponse(event *events.MessageCreate, msg, attachment string) {
