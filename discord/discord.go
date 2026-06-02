@@ -202,6 +202,10 @@ func (d *DiscordClient) onMessageCreate(event *events.MessageCreate) {
 		d.announcePenalties(event)
 	case "!race-setup":
 		d.raceSetup(event)
+	case "!new-season":
+		d.newSeason(event, false)
+	case "!new-season-apply":
+		d.newSeason(event, true)
 	}
 }
 
@@ -382,6 +386,78 @@ func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
 	if err != nil {
 		msg = err.Error()
 	}
+}
+
+func (d *DiscordClient) newSeason(event *events.MessageCreate, apply bool) {
+	var msg, attachment string
+	defer func() { sendBotResponse(event, msg, attachment) }()
+
+	sgClient := simgrid.NewClient(d.conf.SimGridApiToken)
+	var err error
+	msg, attachment, err = d.runNewSeason(apply, sgClient)
+	if err != nil {
+		msg = err.Error()
+	}
+}
+
+// runNewSeason derives the next season (read-only) and, when apply is true,
+// commits the change. Currently only the read-only preview path is implemented;
+// the apply path is filled in by a later task.
+func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient) (string, string, error) {
+	currentTerm, err := config.ParseSeasonTerm(d.conf.Season)
+	if err != nil {
+		return "", "", fmt.Errorf("could not determine current season: %w", err)
+	}
+	nextTerm, err := config.NextTerm(currentTerm)
+	if err != nil {
+		return "", "", err
+	}
+
+	champ, err := sgClient.FindSeasonChampionship("TRACKILICIOUS", nextTerm)
+	if err != nil {
+		return "", "", err
+	}
+	if len(champ.Races) == 0 {
+		return "", "", fmt.Errorf("championship %q (#%d) has no races scheduled yet", champ.Name, champ.ID)
+	}
+
+	year, err := champ.StartYear()
+	if err != nil {
+		return "", "", err
+	}
+	season := fmt.Sprintf("%d %s", year, nextTerm)
+	role, err := config.RoleNameForTerm(nextTerm)
+	if err != nil {
+		return "", "", err
+	}
+	round1 := champ.Races[0].Track.Name
+
+	if !apply {
+		return buildNewSeasonPreview(champ, season, role, round1), "", nil
+	}
+
+	return "", "", fmt.Errorf("applying a new season is not implemented yet")
+}
+
+// buildNewSeasonPreview renders the read-only proposal. It deliberately omits
+// secrets and shows only the season-level values that will change.
+func buildNewSeasonPreview(champ *simgrid.Championship, season, role, round1 string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "🗓 **New Season Preview**\n\n")
+	fmt.Fprintf(&b, "Championship: %s (#%d) — host %s\n", champ.Name, champ.ID, champ.HostName)
+	fmt.Fprintf(&b, "Schedule:\n")
+	for i, race := range champ.Races {
+		fmt.Fprintf(&b, "  R%d %s\n", i+1, race.Track.Name)
+	}
+	fmt.Fprintf(&b, "\nWill set:\n")
+	fmt.Fprintf(&b, "  season             %s\n", season)
+	fmt.Fprintf(&b, "  championship_id    %d\n", champ.ID)
+	fmt.Fprintf(&b, "  discord_role_name  %s\n", role)
+	fmt.Fprintf(&b, "  briefing_folder    %q (created/reused under the current briefing folder's parent)\n", season)
+	fmt.Fprintf(&b, "  tracker_folder     %q (created/reused under the current tracker folder's parent)\n", season)
+	fmt.Fprintf(&b, "Round-0 announces: Round 1 — %s\n", round1)
+	fmt.Fprintf(&b, "\n▶ Run `!new-season-apply` to commit these changes.")
+	return b.String()
 }
 
 func NewDiscordClient(conf *config.Config, gc *gcloud.Client, configPath string) (*DiscordClient, error) {

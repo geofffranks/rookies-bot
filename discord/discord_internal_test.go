@@ -900,3 +900,73 @@ var _ = Describe("generateNextRoundConfig", func() {
 		Expect(result.PreviousRound.PenaltyTrackerLink).To(ContainSubstring("docs.google.com"))
 	})
 })
+
+var _ = Describe("runNewSeason preview", func() {
+	var (
+		client   *DiscordClient
+		stub     *stubRest
+		sgServer *httptest.Server
+		sgClient *simgrid.SimGridClient
+	)
+
+	BeforeEach(func() {
+		stub = &stubRest{}
+		client = NewTestDiscordClient(stub, snowflakeID(1), &config.Config{
+			BotConfig: config.BotConfig{
+				Season:           "Fall",
+				BriefingFolderID: "briefing-current",
+				TrackerFolderID:  "tracker-current",
+			},
+		}, &gcloud.Client{})
+
+		sgServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/championships":
+				_, _ = w.Write([]byte(`[{"id":555,"name":"GT4 Rookies - Winter"}]`))
+			case "/championships/555":
+				_, _ = w.Write([]byte(`{"id":555,"name":"GT4 Rookies - Winter","host_name":"TRACKILICIOUS","start_date":"2026-12-01T00:00:00.000Z","races":[{"track":{"name":"Bathurst"}},{"track":{"name":"Spa"}}]}`))
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		sgClient = simgrid.NewClient("test-token")
+		sgClient.BaseURL = sgServer.URL
+	})
+
+	AfterEach(func() {
+		sgServer.Close()
+	})
+
+	It("returns a preview describing the championship, computed values, and how to apply", func() {
+		msg, attachment, err := client.runNewSeason(false, sgClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(attachment).To(BeEmpty())
+
+		Expect(msg).To(ContainSubstring("GT4 Rookies - Winter"))
+		Expect(msg).To(ContainSubstring("#555"))
+		Expect(msg).To(ContainSubstring("Bathurst"))
+		Expect(msg).To(ContainSubstring("2026 Winter"))
+		Expect(msg).To(ContainSubstring("GT4 Rookies Winter"))
+		Expect(msg).To(ContainSubstring("!new-season-apply"))
+	})
+
+	It("makes no changes in preview mode (config file path never touched)", func() {
+		_, _, err := client.runNewSeason(false, sgClient)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("returns an error when the current season cannot be parsed", func() {
+		client.conf.Season = "Autumn"
+		_, _, err := client.runNewSeason(false, sgClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("could not determine current season"))
+	})
+
+	It("returns an error when no matching championship is found", func() {
+		client.conf.Season = "Summer" // next term = Fall, which the server does not offer
+		_, _, err := client.runNewSeason(false, sgClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("no upcoming"))
+	})
+})
