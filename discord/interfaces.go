@@ -2,6 +2,7 @@ package discord
 
 import (
 	"context"
+	"time"
 
 	dgo "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
@@ -13,7 +14,7 @@ import (
 //counterfeiter:generate . BotRestClient
 type BotRestClient interface {
 	CreateMessage(channelID snowflake.ID, messageCreate dgo.MessageCreate, opts ...rest.RequestOpt) (*dgo.Message, error)
-	GetPinnedMessages(channelID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Message, error)
+	GetChannelPins(channelID snowflake.ID, before time.Time, limit int, opts ...rest.RequestOpt) (*dgo.ChannelPins, error)
 	UnpinMessage(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error
 	PinMessage(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error
 	GetChannel(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error)

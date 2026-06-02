@@ -3,6 +3,7 @@ package fakes
 
 import (
 	"sync"
+	"time"
 
 	discorda "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
@@ -71,18 +72,20 @@ type FakeBotRestClient struct {
 		result1 []discorda.Member
 		result2 error
 	}
-	GetPinnedMessagesStub        func(snowflake.ID, ...rest.RequestOpt) ([]discorda.Message, error)
-	getPinnedMessagesMutex       sync.RWMutex
-	getPinnedMessagesArgsForCall []struct {
+	GetChannelPinsStub        func(snowflake.ID, time.Time, int, ...rest.RequestOpt) (*discorda.ChannelPins, error)
+	getChannelPinsMutex       sync.RWMutex
+	getChannelPinsArgsForCall []struct {
 		arg1 snowflake.ID
-		arg2 []rest.RequestOpt
+		arg2 time.Time
+		arg3 int
+		arg4 []rest.RequestOpt
 	}
-	getPinnedMessagesReturns struct {
-		result1 []discorda.Message
+	getChannelPinsReturns struct {
+		result1 *discorda.ChannelPins
 		result2 error
 	}
-	getPinnedMessagesReturnsOnCall map[int]struct {
-		result1 []discorda.Message
+	getChannelPinsReturnsOnCall map[int]struct {
+		result1 *discorda.ChannelPins
 		result2 error
 	}
 	GetRolesStub        func(snowflake.ID, ...rest.RequestOpt) ([]discorda.Role, error)
@@ -393,19 +396,21 @@ func (fake *FakeBotRestClient) GetMembersReturnsOnCall(i int, result1 []discorda
 	}{result1, result2}
 }
 
-func (fake *FakeBotRestClient) GetPinnedMessages(arg1 snowflake.ID, arg2 ...rest.RequestOpt) ([]discorda.Message, error) {
-	fake.getPinnedMessagesMutex.Lock()
-	ret, specificReturn := fake.getPinnedMessagesReturnsOnCall[len(fake.getPinnedMessagesArgsForCall)]
-	fake.getPinnedMessagesArgsForCall = append(fake.getPinnedMessagesArgsForCall, struct {
+func (fake *FakeBotRestClient) GetChannelPins(arg1 snowflake.ID, arg2 time.Time, arg3 int, arg4 ...rest.RequestOpt) (*discorda.ChannelPins, error) {
+	fake.getChannelPinsMutex.Lock()
+	ret, specificReturn := fake.getChannelPinsReturnsOnCall[len(fake.getChannelPinsArgsForCall)]
+	fake.getChannelPinsArgsForCall = append(fake.getChannelPinsArgsForCall, struct {
 		arg1 snowflake.ID
-		arg2 []rest.RequestOpt
-	}{arg1, arg2})
-	stub := fake.GetPinnedMessagesStub
-	fakeReturns := fake.getPinnedMessagesReturns
-	fake.recordInvocation("GetPinnedMessages", []interface{}{arg1, arg2})
-	fake.getPinnedMessagesMutex.Unlock()
+		arg2 time.Time
+		arg3 int
+		arg4 []rest.RequestOpt
+	}{arg1, arg2, arg3, arg4})
+	stub := fake.GetChannelPinsStub
+	fakeReturns := fake.getChannelPinsReturns
+	fake.recordInvocation("GetChannelPins", []interface{}{arg1, arg2, arg3, arg4})
+	fake.getChannelPinsMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2...)
+		return stub(arg1, arg2, arg3, arg4...)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -413,47 +418,47 @@ func (fake *FakeBotRestClient) GetPinnedMessages(arg1 snowflake.ID, arg2 ...rest
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeBotRestClient) GetPinnedMessagesCallCount() int {
-	fake.getPinnedMessagesMutex.RLock()
-	defer fake.getPinnedMessagesMutex.RUnlock()
-	return len(fake.getPinnedMessagesArgsForCall)
+func (fake *FakeBotRestClient) GetChannelPinsCallCount() int {
+	fake.getChannelPinsMutex.RLock()
+	defer fake.getChannelPinsMutex.RUnlock()
+	return len(fake.getChannelPinsArgsForCall)
 }
 
-func (fake *FakeBotRestClient) GetPinnedMessagesCalls(stub func(snowflake.ID, ...rest.RequestOpt) ([]discorda.Message, error)) {
-	fake.getPinnedMessagesMutex.Lock()
-	defer fake.getPinnedMessagesMutex.Unlock()
-	fake.GetPinnedMessagesStub = stub
+func (fake *FakeBotRestClient) GetChannelPinsCalls(stub func(snowflake.ID, time.Time, int, ...rest.RequestOpt) (*discorda.ChannelPins, error)) {
+	fake.getChannelPinsMutex.Lock()
+	defer fake.getChannelPinsMutex.Unlock()
+	fake.GetChannelPinsStub = stub
 }
 
-func (fake *FakeBotRestClient) GetPinnedMessagesArgsForCall(i int) (snowflake.ID, []rest.RequestOpt) {
-	fake.getPinnedMessagesMutex.RLock()
-	defer fake.getPinnedMessagesMutex.RUnlock()
-	argsForCall := fake.getPinnedMessagesArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+func (fake *FakeBotRestClient) GetChannelPinsArgsForCall(i int) (snowflake.ID, time.Time, int, []rest.RequestOpt) {
+	fake.getChannelPinsMutex.RLock()
+	defer fake.getChannelPinsMutex.RUnlock()
+	argsForCall := fake.getChannelPinsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
-func (fake *FakeBotRestClient) GetPinnedMessagesReturns(result1 []discorda.Message, result2 error) {
-	fake.getPinnedMessagesMutex.Lock()
-	defer fake.getPinnedMessagesMutex.Unlock()
-	fake.GetPinnedMessagesStub = nil
-	fake.getPinnedMessagesReturns = struct {
-		result1 []discorda.Message
+func (fake *FakeBotRestClient) GetChannelPinsReturns(result1 *discorda.ChannelPins, result2 error) {
+	fake.getChannelPinsMutex.Lock()
+	defer fake.getChannelPinsMutex.Unlock()
+	fake.GetChannelPinsStub = nil
+	fake.getChannelPinsReturns = struct {
+		result1 *discorda.ChannelPins
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeBotRestClient) GetPinnedMessagesReturnsOnCall(i int, result1 []discorda.Message, result2 error) {
-	fake.getPinnedMessagesMutex.Lock()
-	defer fake.getPinnedMessagesMutex.Unlock()
-	fake.GetPinnedMessagesStub = nil
-	if fake.getPinnedMessagesReturnsOnCall == nil {
-		fake.getPinnedMessagesReturnsOnCall = make(map[int]struct {
-			result1 []discorda.Message
+func (fake *FakeBotRestClient) GetChannelPinsReturnsOnCall(i int, result1 *discorda.ChannelPins, result2 error) {
+	fake.getChannelPinsMutex.Lock()
+	defer fake.getChannelPinsMutex.Unlock()
+	fake.GetChannelPinsStub = nil
+	if fake.getChannelPinsReturnsOnCall == nil {
+		fake.getChannelPinsReturnsOnCall = make(map[int]struct {
+			result1 *discorda.ChannelPins
 			result2 error
 		})
 	}
-	fake.getPinnedMessagesReturnsOnCall[i] = struct {
-		result1 []discorda.Message
+	fake.getChannelPinsReturnsOnCall[i] = struct {
+		result1 *discorda.ChannelPins
 		result2 error
 	}{result1, result2}
 }

@@ -58,9 +58,9 @@ var _ = Describe("Repin", func() {
 		oldMsgID := snowflake.ID(99)
 		newMsgID := snowflake.ID(100)
 
-		fakeRest.GetPinnedMessagesReturns([]dgo.Message{
-			{ID: oldMsgID, Author: dgo.User{ID: botAppID}},
-		}, nil)
+		fakeRest.GetChannelPinsReturns(&dgo.ChannelPins{Items: []dgo.MessagePin{
+			{Message: dgo.Message{ID: oldMsgID, Author: dgo.User{ID: botAppID}}},
+		}}, nil)
 		fakeRest.UnpinMessageReturns(nil)
 		fakeRest.PinMessageReturns(nil)
 
@@ -83,20 +83,20 @@ var _ = Describe("Repin", func() {
 		fakeRest2 := new(fakes.FakeBotRestClient)
 		dc2 := newTestClient(fakeRest2, conf)
 		otherBotID := snowflake.ID(99999)
-		fakeRest2.GetPinnedMessagesReturns([]dgo.Message{
-			{ID: snowflake.ID(55), Author: dgo.User{ID: otherBotID}},
-		}, nil)
+		fakeRest2.GetChannelPinsReturns(&dgo.ChannelPins{Items: []dgo.MessagePin{
+			{Message: dgo.Message{ID: snowflake.ID(55), Author: dgo.User{ID: otherBotID}}},
+		}}, nil)
 
 		err := dc2.Repin(&dgo.Message{ID: snowflake.ID(100)})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fakeRest2.UnpinMessageCallCount()).To(Equal(0))
 	})
 
-	It("returns an error when GetPinnedMessages fails", func() {
+	It("returns an error when GetChannelPins fails", func() {
 		fakeRest3 := new(fakes.FakeBotRestClient)
 		dc3 := newTestClient(fakeRest3, conf)
 		expectedErr := "test error"
-		fakeRest3.GetPinnedMessagesReturns(nil, &errorMsg{msg: expectedErr})
+		fakeRest3.GetChannelPinsReturns(nil, &errorMsg{msg: expectedErr})
 		err := dc3.Repin(&dgo.Message{ID: snowflake.ID(1)})
 		Expect(err).To(HaveOccurred())
 	})
@@ -104,9 +104,9 @@ var _ = Describe("Repin", func() {
 	It("returns an error when UnpinMessage fails", func() {
 		fakeRest4 := new(fakes.FakeBotRestClient)
 		dc4 := newTestClient(fakeRest4, conf)
-		fakeRest4.GetPinnedMessagesReturns([]dgo.Message{
-			{ID: snowflake.ID(55), Author: dgo.User{ID: snowflake.ID(12345)}},
-		}, nil)
+		fakeRest4.GetChannelPinsReturns(&dgo.ChannelPins{Items: []dgo.MessagePin{
+			{Message: dgo.Message{ID: snowflake.ID(55), Author: dgo.User{ID: snowflake.ID(12345)}}},
+		}}, nil)
 		fakeRest4.UnpinMessageReturns(&errorMsg{msg: "unpin failed"})
 		err := dc4.Repin(&dgo.Message{ID: snowflake.ID(1)})
 		Expect(err).To(HaveOccurred())
@@ -631,7 +631,7 @@ var _ = Describe("SendMessage", func() {
 
 	It("calls CreateMessage on the configured channel with the given message", func() {
 		fakeRest.CreateMessageReturns(&dgo.Message{ID: snowflake.ID(999)}, nil)
-		msg := dgo.NewMessageCreateBuilder().SetContent("test message").Build()
+		msg := dgo.NewMessageCreate().WithContent("test message")
 
 		result, err := dc.SendMessage(msg)
 		Expect(err).NotTo(HaveOccurred())

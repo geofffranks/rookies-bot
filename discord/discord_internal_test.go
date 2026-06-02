@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"time"
 
 	dgo "github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
@@ -308,7 +309,7 @@ var _ = Describe("downloadAttachment", func() {
 // inject only the methods it cares about. All stubs default to no-op / nil.
 type stubRest struct {
 	createMessageFn             func(channelID snowflake.ID, messageCreate dgo.MessageCreate, opts ...rest.RequestOpt) (*dgo.Message, error)
-	getPinnedMessagesFn         func(channelID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Message, error)
+	getChannelPinsFn            func(channelID snowflake.ID, before time.Time, limit int, opts ...rest.RequestOpt) (*dgo.ChannelPins, error)
 	unpinMessageFn              func(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error
 	pinMessageFn                func(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error
 	getChannelFn                func(channelID snowflake.ID, opts ...rest.RequestOpt) (dgo.Channel, error)
@@ -324,11 +325,11 @@ func (s *stubRest) CreateMessage(channelID snowflake.ID, messageCreate dgo.Messa
 	id := snowflake.ID(42)
 	return &dgo.Message{ID: id}, nil
 }
-func (s *stubRest) GetPinnedMessages(channelID snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Message, error) {
-	if s.getPinnedMessagesFn != nil {
-		return s.getPinnedMessagesFn(channelID, opts...)
+func (s *stubRest) GetChannelPins(channelID snowflake.ID, before time.Time, limit int, opts ...rest.RequestOpt) (*dgo.ChannelPins, error) {
+	if s.getChannelPinsFn != nil {
+		return s.getChannelPinsFn(channelID, before, limit, opts...)
 	}
-	return nil, nil
+	return &dgo.ChannelPins{}, nil
 }
 func (s *stubRest) UnpinMessage(channelID snowflake.ID, messageID snowflake.ID, opts ...rest.RequestOpt) error {
 	if s.unpinMessageFn != nil {

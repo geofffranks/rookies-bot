@@ -51,7 +51,7 @@ func (e DiscordHandleNotFoundError) String() string {
 }
 
 type DiscordClient struct {
-	botClient     bot.Client
+	botClient     *bot.Client
 	rest          BotRestClient
 	applicationID snowflake.ID
 	conf          *config.Config
@@ -264,7 +264,7 @@ func sendBotResponse(event *events.MessageCreate, msg, attachment string) {
 				}}
 			}
 		}
-		_, err := event.Client().Rest().CreateMessage(event.ChannelID, dm)
+		_, err := event.Client().Rest.CreateMessage(event.ChannelID, dm)
 		if err != nil {
 			fmt.Println("Error sending message:", err)
 		}
@@ -580,8 +580,8 @@ func NewDiscordClient(conf *config.Config, gc *gcloud.Client, configPath string)
 	dc := &DiscordClient{
 		conf:          conf,
 		botClient:     client,
-		rest:          client.Rest(),
-		applicationID: client.ApplicationID(),
+		rest:          client.Rest,
+		applicationID: client.ApplicationID,
 		gcloud:        gc,
 		configPath:    configPath,
 	}
@@ -647,13 +647,13 @@ func (d *DiscordClient) SendMessage(message discord.MessageCreate) (*discord.Mes
 }
 
 func (d *DiscordClient) Repin(message *discord.Message) error {
-	pinnedMessages, err := d.rest.GetPinnedMessages(d.conf.DiscordChannelId)
+	pins, err := d.rest.GetChannelPins(d.conf.DiscordChannelId, time.Time{}, 0)
 	if err != nil {
 		return err
 	}
-	for _, msg := range pinnedMessages {
-		if msg.Author.ID == d.applicationID {
-			err := d.rest.UnpinMessage(d.conf.DiscordChannelId, msg.ID)
+	for _, pin := range pins.Items {
+		if pin.Message.Author.ID == d.applicationID {
+			err := d.rest.UnpinMessage(d.conf.DiscordChannelId, pin.Message.ID)
 			if err != nil {
 				return err
 			}
@@ -684,7 +684,7 @@ func (d *DiscordClient) CreateBriefingEvent(config *config.RoundConfig) error {
 }
 
 func buildMessage(message string) discord.MessageCreate {
-	return discord.NewMessageCreateBuilder().SetContent(message).SetSuppressEmbeds(true).Build()
+	return discord.NewMessageCreate().WithContent(message).WithSuppressEmbeds(true)
 }
 
 func (d *DiscordClient) briefingTime() (time.Time, error) {
