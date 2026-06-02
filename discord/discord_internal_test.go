@@ -1072,4 +1072,12 @@ discord_token: keep-me-secret
 		data, _ := os.ReadFile(configPath)
 		Expect(string(data)).To(ContainSubstring("season: Fall"))
 	})
+
+	It("does not mutate the live config when the config-file write fails", func() {
+		client.configPath = "/no/such/dir/config.yml"
+		_, _, err := client.runNewSeason(true, sgClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed updating config file"))
+		Expect(client.conf.Season).To(Equal("Fall"))
+	})
 })

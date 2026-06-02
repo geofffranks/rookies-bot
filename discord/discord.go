@@ -450,6 +450,13 @@ func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient
 		return "", "", fmt.Errorf("failed setting up tracker folder: %w", err)
 	}
 
+	// Generate the round-0 config before committing any config change, so that a
+	// failure here leaves the existing config (file and in-memory) untouched.
+	attachment, err := writeRoundZeroConfig(season, round1)
+	if err != nil {
+		return "", "", fmt.Errorf("failed generating round-0 config: %w", err)
+	}
+
 	// persist the five season-level values, preserving comments and secrets
 	updates := map[string]string{
 		"season":             season,
@@ -470,11 +477,6 @@ func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient
 	d.conf.BriefingFolderID = briefingID
 	d.conf.TrackerFolderID = trackerID
 	d.mu.Unlock()
-
-	attachment, err := writeRoundZeroConfig(season, round1)
-	if err != nil {
-		return "", "", fmt.Errorf("failed generating round-0 config: %w", err)
-	}
 
 	return buildNewSeasonApplied(champ, season, role, round1, briefingID, trackerID), attachment, nil
 }
