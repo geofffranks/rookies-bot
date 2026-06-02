@@ -110,6 +110,34 @@ func (c *Client) GenerateBriefing(conf *config.Config, penalties *models.Penalti
 	return fmt.Sprintf("https://docs.google.com/document/d/%s", briefingFile.Id), nil
 }
 
+// EnsureSeasonFolder finds or creates a folder named seasonName as a sibling of
+// currentFolderID (i.e. under the same parent). It returns the id of the
+// existing folder if one already exists, making re-runs idempotent.
+func (c *Client) EnsureSeasonFolder(ctx context.Context, currentFolderID, seasonName string) (string, error) {
+	current, err := c.Drive.GetFile(ctx, currentFolderID)
+	if err != nil {
+		return "", fmt.Errorf("failed looking up current folder %s: %w", currentFolderID, err)
+	}
+	if len(current.Parents) == 0 {
+		return "", fmt.Errorf("current folder %s has no parent folder to create %q alongside", currentFolderID, seasonName)
+	}
+	parentID := current.Parents[0]
+
+	existing, err := c.Drive.FindFolder(ctx, parentID, seasonName)
+	if err != nil {
+		return "", fmt.Errorf("failed searching for existing %q folder: %w", seasonName, err)
+	}
+	if existing != nil {
+		return existing.Id, nil
+	}
+
+	created, err := c.Drive.CreateFolder(ctx, parentID, seasonName)
+	if err != nil {
+		return "", fmt.Errorf("failed creating %q folder: %w", seasonName, err)
+	}
+	return created.Id, nil
+}
+
 func (c *Client) GeneratePenaltyTracker(conf *config.Config) (string, error) {
 	ctx := context.Background()
 	file, err := c.Drive.CopyFile(ctx, conf.TrackerTemplateDocID, conf.TrackerFolderID,

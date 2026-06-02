@@ -1,6 +1,7 @@
 package gcloud_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -363,5 +364,68 @@ var _ = Describe("generateUpdates carried-over penalties", func() {
 		// BUG: should return error "no Stream heading found", but currently succeeds
 		_, err := client.GenerateBriefing(conf, &models.Penalties{})
 		Expect(err).NotTo(HaveOccurred()) // documents current buggy behavior
+	})
+})
+
+var _ = Describe("EnsureSeasonFolder", func() {
+	var (
+		fakeDrive *fakes.FakeDriveServicer
+		client    *gcloud.Client
+	)
+
+	BeforeEach(func() {
+		fakeDrive = new(fakes.FakeDriveServicer)
+		client = &gcloud.Client{Drive: fakeDrive}
+		// current folder lives under parent "parent-1"
+		fakeDrive.GetFileReturns(&drive.File{Id: "current-folder", Parents: []string{"parent-1"}}, nil)
+	})
+
+	It("returns the existing folder id when one already exists (idempotent)", func() {
+		fakeDrive.FindFolderReturns(&drive.File{Id: "existing-season"}, nil)
+
+		id, err := client.EnsureSeasonFolder(context.Background(), "current-folder", "2026 Summer")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(id).To(Equal("existing-season"))
+		Expect(fakeDrive.CreateFolderCallCount()).To(Equal(0))
+
+		_, parentID, name := fakeDrive.FindFolderArgsForCall(0)
+		Expect(parentID).To(Equal("parent-1"))
+		Expect(name).To(Equal("2026 Summer"))
+	})
+
+	It("creates a new folder under the current folder's parent when none exists", func() {
+		fakeDrive.FindFolderReturns(nil, nil)
+		fakeDrive.CreateFolderReturns(&drive.File{Id: "new-season"}, nil)
+
+		id, err := client.EnsureSeasonFolder(context.Background(), "current-folder", "2026 Summer")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(id).To(Equal("new-season"))
+
+		Expect(fakeDrive.CreateFolderCallCount()).To(Equal(1))
+		_, parentID, name := fakeDrive.CreateFolderArgsForCall(0)
+		Expect(parentID).To(Equal("parent-1"))
+		Expect(name).To(Equal("2026 Summer"))
+	})
+
+	It("returns an error when the current folder lookup fails", func() {
+		fakeDrive.GetFileReturns(nil, errors.New("drive down"))
+		_, err := client.EnsureSeasonFolder(context.Background(), "current-folder", "2026 Summer")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("drive down"))
+	})
+
+	It("returns an error when the current folder has no parent", func() {
+		fakeDrive.GetFileReturns(&drive.File{Id: "current-folder", Parents: nil}, nil)
+		_, err := client.EnsureSeasonFolder(context.Background(), "current-folder", "2026 Summer")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("no parent"))
+	})
+
+	It("returns an error when folder creation fails", func() {
+		fakeDrive.FindFolderReturns(nil, nil)
+		fakeDrive.CreateFolderReturns(nil, errors.New("create failed"))
+		_, err := client.EnsureSeasonFolder(context.Background(), "current-folder", "2026 Summer")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("create failed"))
 	})
 })
