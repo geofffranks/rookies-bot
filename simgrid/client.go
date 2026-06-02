@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/geofffranks/rookies-bot/config"
@@ -160,6 +162,47 @@ func (sgc *SimGridClient) GetChampionship(id string) (*Championship, error) {
 		return nil, err
 	}
 	return &champ, nil
+}
+
+// FindSeasonChampionship finds the single upcoming championship hosted by host
+// whose name contains both "rookies" and the given season term. Candidates are
+// pre-filtered by name from the cheap index call, then confirmed against the
+// detail endpoint's host_name. Returns an error when zero or more than one
+// championship matches.
+func (sgc *SimGridClient) FindSeasonChampionship(host, term string) (*Championship, error) {
+	items, err := sgc.ListUpcomingChampionships()
+	if err != nil {
+		return nil, fmt.Errorf("failed listing upcoming championships: %w", err)
+	}
+
+	lowerTerm := strings.ToLower(term)
+	var matches []*Championship
+	for _, item := range items {
+		lowerName := strings.ToLower(item.Name)
+		if !strings.Contains(lowerName, "rookies") || !strings.Contains(lowerName, lowerTerm) {
+			continue
+		}
+		champ, err := sgc.GetChampionship(strconv.Itoa(item.ID))
+		if err != nil {
+			return nil, fmt.Errorf("failed fetching championship %d: %w", item.ID, err)
+		}
+		if strings.EqualFold(champ.HostName, host) {
+			matches = append(matches, champ)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return nil, fmt.Errorf("no upcoming %s Rookies championship matching season %q found", host, term)
+	case 1:
+		return matches[0], nil
+	default:
+		names := make([]string, 0, len(matches))
+		for _, m := range matches {
+			names = append(names, fmt.Sprintf("%q (#%d)", m.Name, m.ID))
+		}
+		return nil, fmt.Errorf("multiple upcoming %s Rookies championships match season %q: %s", host, term, strings.Join(names, ", "))
+	}
 }
 
 func (sgc *SimGridClient) GetNextRound(id string, prev config.Round) (*config.Round, error) {

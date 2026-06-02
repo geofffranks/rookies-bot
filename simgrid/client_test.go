@@ -295,6 +295,68 @@ var _ = Describe("SimGridClient", func() {
 			Expect(err.Error()).To(ContainSubstring("HTTP request failure"))
 		})
 	})
+
+	Describe("FindSeasonChampionship", func() {
+		BeforeEach(func() {
+			mux.HandleFunc("/championships", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`[
+					{"id":1,"name":"TRACKILICIOUS - GT3 - Summer Sprint Series"},
+					{"id":2,"name":"GT4 Rookies - Summer"},
+					{"id":3,"name":"GT4 Rookies - Winter"},
+					{"id":4,"name":"Some Other Org Rookies - Summer"}
+				]`))
+			})
+			mux.HandleFunc("/championships/2", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"id":2,"name":"GT4 Rookies - Summer","host_name":"TRACKILICIOUS","start_date":"2026-06-08T00:00:00.000Z","races":[{"track":{"name":"Misano"}}]}`))
+			})
+			mux.HandleFunc("/championships/3", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"id":3,"name":"GT4 Rookies - Winter","host_name":"TRACKILICIOUS","start_date":"2026-12-01T00:00:00.000Z","races":[{"track":{"name":"Bathurst"}}]}`))
+			})
+			mux.HandleFunc("/championships/4", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"id":4,"name":"Some Other Org Rookies - Summer","host_name":"SOMEONE ELSE","start_date":"2026-06-08T00:00:00.000Z","races":[{"track":{"name":"Spa"}}]}`))
+			})
+		})
+
+		It("returns the single trackilicious Rookies championship matching the term", func() {
+			champ, err := client.FindSeasonChampionship("TRACKILICIOUS", "Summer")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(champ.ID).To(Equal(2))
+			Expect(champ.Name).To(Equal("GT4 Rookies - Summer"))
+			Expect(champ.Races[0].Track.Name).To(Equal("Misano"))
+		})
+
+		It("ignores non-Rookies events and other hosts (host match is case-insensitive)", func() {
+			champ, err := client.FindSeasonChampionship("trackilicious", "Winter")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(champ.ID).To(Equal(3))
+		})
+
+		It("returns an error when no championship matches the term", func() {
+			_, err := client.FindSeasonChampionship("TRACKILICIOUS", "Spring")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no upcoming"))
+			Expect(err.Error()).To(ContainSubstring("Spring"))
+		})
+	})
+
+	Describe("FindSeasonChampionship with multiple matches", func() {
+		It("returns an error listing the ambiguous matches", func() {
+			mux.HandleFunc("/championships", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`[{"id":10,"name":"GT4 Rookies - Summer A"},{"id":11,"name":"GT4 Rookies - Summer B"}]`))
+			})
+			mux.HandleFunc("/championships/10", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"id":10,"name":"GT4 Rookies - Summer A","host_name":"TRACKILICIOUS","start_date":"2026-06-08T00:00:00.000Z","races":[]}`))
+			})
+			mux.HandleFunc("/championships/11", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"id":11,"name":"GT4 Rookies - Summer B","host_name":"TRACKILICIOUS","start_date":"2026-06-08T00:00:00.000Z","races":[]}`))
+			})
+
+			_, err := client.FindSeasonChampionship("TRACKILICIOUS", "Summer")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("multiple"))
+		})
+	})
 })
 
 var _ simgrid.EntryListResp
