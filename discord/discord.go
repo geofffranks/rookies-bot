@@ -59,7 +59,16 @@ type DiscordClient struct {
 	memberList    map[string]snowflake.ID
 	gcloud        *gcloud.Client
 	configPath    string
-	mu            sync.Mutex
+	mu            sync.RWMutex
+}
+
+// snapshotConfig returns a copy of the live bot config. Handlers read config
+// through this so they never observe a torn write while !new-season-apply
+// mutates the in-memory config under mu.
+func (d *DiscordClient) snapshotConfig() config.BotConfig {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.conf.BotConfig
 }
 
 func downloadAttachment(url string) ([]byte, error) {
@@ -99,7 +108,8 @@ func writeNextRoundConfig(conf *config.RoundConfig, season string) (string, erro
 		return "", err
 	}
 
-	nextConfigFileName := strings.ToLower(fmt.Sprintf("%s-round-%d-%s.yml", season, conf.NextRound.Number, strings.ReplaceAll(conf.NextRound.Track, " ", "-")))
+	seasonSlug := strings.ReplaceAll(season, " ", "-")
+	nextConfigFileName := strings.ToLower(fmt.Sprintf("%s-round-%d-%s.yml", seasonSlug, conf.NextRound.Number, strings.ReplaceAll(conf.NextRound.Track, " ", "-")))
 	err = os.WriteFile(nextConfigFileName, data, 0600)
 	if err != nil {
 		return "", err
@@ -239,11 +249,20 @@ func sendBotResponse(event *events.MessageCreate, msg, attachment string) {
 			file, err := os.Open(attachment) // #nosec G304 -- path written by this process from config, not user input
 			if err != nil {
 				fmt.Printf("Error attaching file %s: %s\n", attachment, err)
+			} else {
+				// The attachment is a temp config file written by this process;
+				// close it and remove it from disk once the message is sent.
+				defer func() {
+					_ = file.Close()
+					if err := os.Remove(attachment); err != nil {
+						fmt.Printf("Error removing temp file %s: %s\n", attachment, err)
+					}
+				}()
+				dm.Files = []*discord.File{{
+					Name:   attachment,
+					Reader: file,
+				}}
 			}
-			dm.Files = []*discord.File{{
-				Name:   attachment,
-				Reader: file,
-			}}
 		}
 		_, err := event.Client().Rest().CreateMessage(event.ChannelID, dm)
 		if err != nil {
@@ -254,7 +273,8 @@ func sendBotResponse(event *events.MessageCreate, msg, attachment string) {
 	}
 }
 func (d *DiscordClient) runAnnouncePenalties(roundConfig *config.RoundConfig, sgClient *simgrid.SimGridClient) (string, string, error) {
-	driverLookup, err := sgClient.BuildDriverLookup(d.conf.ChampionshipId)
+	conf := d.snapshotConfig()
+	driverLookup, err := sgClient.BuildDriverLookup(conf.ChampionshipId)
 	if err != nil {
 		return "", "", fmt.Errorf("failed building driver list: %w", err)
 	}
@@ -290,7 +310,7 @@ func (d *DiscordClient) announcePenalties(event *events.MessageCreate) {
 		msg = fmt.Sprintf("Failed getting race config: %s", err)
 		return
 	}
-	sgClient := simgrid.NewClient(d.conf.SimGridApiToken)
+	sgClient := simgrid.NewClient(d.snapshotConfig().SimGridApiToken)
 	msg, attachment, err = d.runAnnouncePenalties(roundConfig, sgClient)
 	if err != nil {
 		msg = err.Error()
@@ -298,7 +318,8 @@ func (d *DiscordClient) announcePenalties(event *events.MessageCreate) {
 }
 
 func (d *DiscordClient) runRaceSetup(roundConfig *config.RoundConfig, sgClient *simgrid.SimGridClient, gcClient *gcloud.Client) (string, string, error) {
-	driverLookup, err := sgClient.BuildDriverLookup(d.conf.ChampionshipId)
+	conf := d.snapshotConfig()
+	driverLookup, err := sgClient.BuildDriverLookup(conf.ChampionshipId)
 	if err != nil {
 		return "", "", err
 	}
@@ -310,7 +331,7 @@ func (d *DiscordClient) runRaceSetup(roundConfig *config.RoundConfig, sgClient *
 
 	briefingUrl, err := gcClient.GenerateBriefing(&config.Config{
 		RoundConfig: *roundConfig,
-		BotConfig:   d.conf.BotConfig,
+		BotConfig:   conf,
 	}, penalties)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate briefing doc: %w", err)
@@ -321,13 +342,13 @@ func (d *DiscordClient) runRaceSetup(roundConfig *config.RoundConfig, sgClient *
 	if roundConfig.NextRound.Track != "" {
 		bigConfig := &config.Config{
 			RoundConfig: *roundConfig,
-			BotConfig:   d.conf.BotConfig,
+			BotConfig:   conf,
 		}
 		nextRoundConfig, err = generateNextRoundConfig(sgClient, gcClient, bigConfig, penalties)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to generate config for next round: %w", err)
 		}
-		attachment, err = writeNextRoundConfig(nextRoundConfig, d.conf.Season)
+		attachment, err = writeNextRoundConfig(nextRoundConfig, conf.Season)
 		if err != nil {
 			return "", "", err
 		}
@@ -377,7 +398,7 @@ func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
 		msg = err.Error()
 		return
 	}
-	sgClient := simgrid.NewClient(d.conf.SimGridApiToken)
+	sgClient := simgrid.NewClient(d.snapshotConfig().SimGridApiToken)
 	gcClient, err := gcloud.NewClient(context.Background())
 	if err != nil {
 		msg = err.Error()
@@ -393,7 +414,7 @@ func (d *DiscordClient) newSeason(event *events.MessageCreate, apply bool) {
 	var msg, attachment string
 	defer func() { sendBotResponse(event, msg, attachment) }()
 
-	sgClient := simgrid.NewClient(d.conf.SimGridApiToken)
+	sgClient := simgrid.NewClient(d.snapshotConfig().SimGridApiToken)
 	var err error
 	msg, attachment, err = d.runNewSeason(apply, sgClient)
 	if err != nil {
@@ -405,7 +426,8 @@ func (d *DiscordClient) newSeason(event *events.MessageCreate, apply bool) {
 // commits the change. Currently only the read-only preview path is implemented;
 // the apply path is filled in by a later task.
 func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient) (string, string, error) {
-	currentTerm, err := config.ParseSeasonTerm(d.conf.Season)
+	conf := d.snapshotConfig()
+	currentTerm, err := config.ParseSeasonTerm(conf.Season)
 	if err != nil {
 		return "", "", fmt.Errorf("could not determine current season: %w", err)
 	}
@@ -441,11 +463,11 @@ func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient
 
 	// apply: create the season's Drive folders (idempotent find-or-create)
 	ctx := context.Background()
-	briefingID, err := d.gcloud.EnsureSeasonFolder(ctx, d.conf.BriefingFolderID, season)
+	briefingID, err := d.gcloud.EnsureSeasonFolder(ctx, conf.BriefingFolderID, season)
 	if err != nil {
 		return "", "", fmt.Errorf("failed setting up briefing folder: %w", err)
 	}
-	trackerID, err := d.gcloud.EnsureSeasonFolder(ctx, d.conf.TrackerFolderID, season)
+	trackerID, err := d.gcloud.EnsureSeasonFolder(ctx, conf.TrackerFolderID, season)
 	if err != nil {
 		return "", "", fmt.Errorf("failed setting up tracker folder: %w", err)
 	}
@@ -456,6 +478,14 @@ func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient
 	if err != nil {
 		return "", "", fmt.Errorf("failed generating round-0 config: %w", err)
 	}
+	// If a later step fails, the round-0 file would be orphaned on disk; remove
+	// it unless we reach a successful commit (where it is returned for sending).
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(attachment)
+		}
+	}()
 
 	// persist the five season-level values, preserving comments and secrets
 	updates := map[string]string{
@@ -478,6 +508,7 @@ func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient
 	d.conf.TrackerFolderID = trackerID
 	d.mu.Unlock()
 
+	committed = true
 	return buildNewSeasonApplied(champ, season, role, round1, briefingID, trackerID), attachment, nil
 }
 
@@ -584,7 +615,7 @@ Stewarding is in from Round %d. The following penalties are to be served next we
 }
 
 func (d *DiscordClient) BuildBriefingMessage(penalties *models.Penalties, briefingUrl string, config *config.RoundConfig) (discord.MessageCreate, error) {
-	role, err := d.lookupRole(d.conf.DiscordRoleName)
+	role, err := d.lookupRole(d.snapshotConfig().DiscordRoleName)
 	if err != nil {
 		return discord.MessageCreate{}, err
 	}

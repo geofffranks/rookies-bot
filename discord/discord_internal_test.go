@@ -981,6 +981,7 @@ var _ = Describe("runNewSeason apply", func() {
 		gcClient   *gcloud.Client
 		tmpDir     string
 		configPath string
+		origWD     string
 	)
 
 	BeforeEach(func() {
@@ -1004,6 +1005,12 @@ briefing_folder_id: briefing-current
 tracker_folder_id: tracker-current
 discord_token: keep-me-secret
 `), 0600)).To(Succeed())
+
+		// Each spec writes its round-0 config into the CWD; isolate the CWD per
+		// spec so parallel Ginkgo workers don't collide on the same file name.
+		origWD, err = os.Getwd()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(os.Chdir(tmpDir)).To(Succeed())
 
 		client = NewTestDiscordClient(stub, snowflakeID(1), &config.Config{
 			BotConfig: config.BotConfig{
@@ -1031,8 +1038,8 @@ discord_token: keep-me-secret
 
 	AfterEach(func() {
 		sgServer.Close()
+		_ = os.Chdir(origWD)
 		os.RemoveAll(tmpDir)
-		_ = os.Remove("2026-winter-round-0.yml")
 	})
 
 	It("creates folders, rewrites config, updates live config, and attaches round-0", func() {
@@ -1079,5 +1086,50 @@ discord_token: keep-me-secret
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed updating config file"))
 		Expect(client.conf.Season).To(Equal("Fall"))
+	})
+
+	It("removes the orphaned round-0 file when the config-file write fails", func() {
+		client.configPath = "/no/such/dir/config.yml"
+		_, _, err := client.runNewSeason(true, sgClient)
+		Expect(err).To(HaveOccurred())
+		_, statErr := os.Stat("2026-winter-round-0.yml")
+		Expect(os.IsNotExist(statErr)).To(BeTrue())
+	})
+})
+
+var _ = Describe("writeNextRoundConfig", func() {
+	It("normalizes spaces in the season so the generated filename has none", func() {
+		rc := &config.RoundConfig{NextRound: config.Round{Number: 3, Track: "Watkins Glen"}}
+		name, err := writeNextRoundConfig(rc, "2026 Winter")
+		Expect(err).NotTo(HaveOccurred())
+		defer func() { _ = os.Remove(name) }()
+		Expect(name).To(Equal("2026-winter-round-3-watkins-glen.yml"))
+		Expect(name).NotTo(ContainSubstring(" "))
+	})
+})
+
+var _ = Describe("snapshotConfig", func() {
+	It("is safe for concurrent reads while apply mutates the live config", func() {
+		client := NewTestDiscordClient(&stubRest{}, snowflakeID(1), &config.Config{
+			BotConfig: config.BotConfig{Season: "Fall", ChampionshipId: "1"},
+		}, &gcloud.Client{})
+
+		done := make(chan struct{})
+		go func() {
+			defer GinkgoRecover()
+			for i := 0; i < 1000; i++ {
+				client.mu.Lock()
+				client.conf.Season = fmt.Sprintf("2026 Winter %d", i)
+				client.conf.ChampionshipId = fmt.Sprintf("%d", i)
+				client.mu.Unlock()
+			}
+			close(done)
+		}()
+		for i := 0; i < 1000; i++ {
+			snap := client.snapshotConfig()
+			_ = snap.Season
+			_ = snap.ChampionshipId
+		}
+		<-done
 	})
 })
