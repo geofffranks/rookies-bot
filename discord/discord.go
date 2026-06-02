@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -436,7 +437,82 @@ func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient
 		return buildNewSeasonPreview(champ, season, role, round1), "", nil
 	}
 
-	return "", "", fmt.Errorf("applying a new season is not implemented yet")
+	champID := strconv.Itoa(champ.ID)
+
+	// apply: create the season's Drive folders (idempotent find-or-create)
+	ctx := context.Background()
+	briefingID, err := d.gcloud.EnsureSeasonFolder(ctx, d.conf.BriefingFolderID, season)
+	if err != nil {
+		return "", "", fmt.Errorf("failed setting up briefing folder: %w", err)
+	}
+	trackerID, err := d.gcloud.EnsureSeasonFolder(ctx, d.conf.TrackerFolderID, season)
+	if err != nil {
+		return "", "", fmt.Errorf("failed setting up tracker folder: %w", err)
+	}
+
+	// persist the five season-level values, preserving comments and secrets
+	updates := map[string]string{
+		"season":             season,
+		"championship_id":    champID,
+		"discord_role_name":  role,
+		"briefing_folder_id": briefingID,
+		"tracker_folder_id":  trackerID,
+	}
+	if err := config.UpdateBotConfigFile(d.configPath, updates); err != nil {
+		return "", "", fmt.Errorf("failed updating config file: %w", err)
+	}
+
+	// update the live in-memory config so the change takes effect without a restart
+	d.mu.Lock()
+	d.conf.Season = season
+	d.conf.ChampionshipId = champID
+	d.conf.DiscordRoleName = role
+	d.conf.BriefingFolderID = briefingID
+	d.conf.TrackerFolderID = trackerID
+	d.mu.Unlock()
+
+	attachment, err := writeRoundZeroConfig(season, round1)
+	if err != nil {
+		return "", "", fmt.Errorf("failed generating round-0 config: %w", err)
+	}
+
+	return buildNewSeasonApplied(champ, season, role, round1, briefingID, trackerID), attachment, nil
+}
+
+// writeRoundZeroConfig writes a round-0 config (next round = round 1 at the
+// season opener, no penalties, no previous round) to the working directory and
+// returns the file name.
+func writeRoundZeroConfig(season, round1Track string) (string, error) {
+	rc := &config.RoundConfig{
+		NextRound: config.Round{Number: 1, Track: round1Track},
+	}
+	data, err := yaml.Marshal(rc)
+	if err != nil {
+		return "", err
+	}
+	slug := strings.ToLower(strings.ReplaceAll(season, " ", "-"))
+	fileName := fmt.Sprintf("%s-round-0.yml", slug)
+	if err := os.WriteFile(fileName, data, 0600); err != nil { // #nosec G306 -- non-sensitive round config, matches existing writeNextRoundConfig
+		return "", err
+	}
+	return fileName, nil
+}
+
+// buildNewSeasonApplied renders the confirmation posted after a successful
+// apply. It omits secrets and explains the next step.
+func buildNewSeasonApplied(champ *simgrid.Championship, season, role, round1, briefingID, trackerID string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "✅ **New Season Applied: %s**\n\n", season)
+	fmt.Fprintf(&b, "Championship: %s (#%d)\n", champ.Name, champ.ID)
+	fmt.Fprintf(&b, "Updated config:\n")
+	fmt.Fprintf(&b, "  season             %s\n", season)
+	fmt.Fprintf(&b, "  championship_id    %d\n", champ.ID)
+	fmt.Fprintf(&b, "  discord_role_name  %s\n", role)
+	fmt.Fprintf(&b, "  briefing_folder_id %s\n", briefingID)
+	fmt.Fprintf(&b, "  tracker_folder_id  %s\n", trackerID)
+	fmt.Fprintf(&b, "\nThe bot is now using the new season — no restart needed.\n")
+	fmt.Fprintf(&b, "Attached round-0 config announces Round 1 — %s. Run `!race-setup` with it to announce week 1.", round1)
+	return b.String()
 }
 
 // buildNewSeasonPreview renders the read-only proposal. It deliberately omits

@@ -970,3 +970,106 @@ var _ = Describe("runNewSeason preview", func() {
 		Expect(err.Error()).To(ContainSubstring("no upcoming"))
 	})
 })
+
+var _ = Describe("runNewSeason apply", func() {
+	var (
+		client     *DiscordClient
+		stub       *stubRest
+		sgServer   *httptest.Server
+		sgClient   *simgrid.SimGridClient
+		fakeDrive  *fakes.FakeDriveServicer
+		gcClient   *gcloud.Client
+		tmpDir     string
+		configPath string
+	)
+
+	BeforeEach(func() {
+		stub = &stubRest{}
+		fakeDrive = &fakes.FakeDriveServicer{}
+		gcClient = &gcloud.Client{Drive: fakeDrive}
+
+		fakeDrive.GetFileReturns(&drive.File{Id: "current", Parents: []string{"parent-1"}}, nil)
+		fakeDrive.FindFolderReturns(nil, nil)
+		fakeDrive.CreateFolderReturnsOnCall(0, &drive.File{Id: "briefing-new"}, nil)
+		fakeDrive.CreateFolderReturnsOnCall(1, &drive.File{Id: "tracker-new"}, nil)
+
+		var err error
+		tmpDir, err = os.MkdirTemp("", "rookies-bot-newseason-test")
+		Expect(err).NotTo(HaveOccurred())
+		configPath = tmpDir + "/config.yml"
+		Expect(os.WriteFile(configPath, []byte(`season: Fall
+championship_id: "9485"
+discord_role_name: GT4 Rookie
+briefing_folder_id: briefing-current
+tracker_folder_id: tracker-current
+discord_token: keep-me-secret
+`), 0600)).To(Succeed())
+
+		client = NewTestDiscordClient(stub, snowflakeID(1), &config.Config{
+			BotConfig: config.BotConfig{
+				Season:           "Fall",
+				BriefingFolderID: "briefing-current",
+				TrackerFolderID:  "tracker-current",
+			},
+		}, gcClient)
+		client.configPath = configPath
+
+		sgServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			switch r.URL.Path {
+			case "/championships":
+				_, _ = w.Write([]byte(`[{"id":555,"name":"GT4 Rookies - Winter"}]`))
+			case "/championships/555":
+				_, _ = w.Write([]byte(`{"id":555,"name":"GT4 Rookies - Winter","host_name":"TRACKILICIOUS","start_date":"2026-12-01T00:00:00.000Z","races":[{"track":{"name":"Bathurst"}}]}`))
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		sgClient = simgrid.NewClient("test-token")
+		sgClient.BaseURL = sgServer.URL
+	})
+
+	AfterEach(func() {
+		sgServer.Close()
+		os.RemoveAll(tmpDir)
+		_ = os.Remove("2026-winter-round-0.yml")
+	})
+
+	It("creates folders, rewrites config, updates live config, and attaches round-0", func() {
+		msg, attachment, err := client.runNewSeason(true, sgClient)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(fakeDrive.CreateFolderCallCount()).To(Equal(2))
+
+		Expect(client.conf.Season).To(Equal("2026 Winter"))
+		Expect(client.conf.ChampionshipId).To(Equal("555"))
+		Expect(client.conf.DiscordRoleName).To(Equal("GT4 Rookies Winter"))
+		Expect(client.conf.BriefingFolderID).To(Equal("briefing-new"))
+		Expect(client.conf.TrackerFolderID).To(Equal("tracker-new"))
+
+		data, err := os.ReadFile(configPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(data)).To(ContainSubstring("2026 Winter"))
+		Expect(string(data)).To(ContainSubstring("GT4 Rookies Winter"))
+		Expect(string(data)).To(ContainSubstring("keep-me-secret"))
+
+		Expect(attachment).To(Equal("2026-winter-round-0.yml"))
+		rcData, err := os.ReadFile(attachment)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(rcData)).To(ContainSubstring("number: 1"))
+		Expect(string(rcData)).To(ContainSubstring("Bathurst"))
+
+		Expect(msg).To(ContainSubstring("2026 Winter"))
+		Expect(msg).To(ContainSubstring("!race-setup"))
+	})
+
+	It("returns an error when folder creation fails (no config written)", func() {
+		fakeDrive.CreateFolderReturnsOnCall(0, nil, fmt.Errorf("drive create failed"))
+		_, _, err := client.runNewSeason(true, sgClient)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("briefing folder"))
+
+		data, _ := os.ReadFile(configPath)
+		Expect(string(data)).To(ContainSubstring("season: Fall"))
+	})
+})
