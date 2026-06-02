@@ -494,7 +494,7 @@ func writeRoundZeroConfig(season, round1Track string) (string, error) {
 	}
 	slug := strings.ToLower(strings.ReplaceAll(season, " ", "-"))
 	fileName := fmt.Sprintf("%s-round-0.yml", slug)
-	if err := os.WriteFile(fileName, data, 0600); err != nil { // #nosec G306 -- non-sensitive round config, matches existing writeNextRoundConfig
+	if err := os.WriteFile(fileName, data, 0600); err != nil {
 		return "", err
 	}
 	return fileName, nil
