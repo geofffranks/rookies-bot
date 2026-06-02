@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/geofffranks/rookies-bot/config"
 	"github.com/geofffranks/rookies-bot/models"
@@ -48,7 +49,27 @@ type Track struct {
 }
 
 type Championship struct {
-	Races []Race `json:"races"`
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	HostName  string `json:"host_name"`
+	StartDate string `json:"start_date"`
+	Races     []Race `json:"races"`
+}
+
+// StartYear parses the championship's RFC3339 start_date and returns its year.
+func (c *Championship) StartYear() (int, error) {
+	t, err := time.Parse(time.RFC3339, c.StartDate)
+	if err != nil {
+		return 0, fmt.Errorf("could not parse championship start date %q: %w", c.StartDate, err)
+	}
+	return t.Year(), nil
+}
+
+// ChampionshipListItem is a single entry in the championships index response,
+// which carries only id and name.
+type ChampionshipListItem struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 
 type User struct {
@@ -100,7 +121,29 @@ func (sgc *SimGridClient) UsersForChampionship(id string) ([]User, error) {
 	return users, nil
 }
 
-func (sgc *SimGridClient) GetNextRound(id string, prev config.Round) (*config.Round, error) {
+// ListUpcomingChampionships returns all upcoming multi-race championships
+// (id + name only).
+func (sgc *SimGridClient) ListUpcomingChampionships() ([]ChampionshipListItem, error) {
+	resp, err := sgc.makeRequest("GET", "/championships?status=upcoming&races_count=full_championships")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var items []ChampionshipListItem
+	if err := json.Unmarshal(data, &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// GetChampionship returns the full detail for a single championship.
+func (sgc *SimGridClient) GetChampionship(id string) (*Championship, error) {
 	resp, err := sgc.makeRequest("GET", fmt.Sprintf("/championships/%s", id))
 	if err != nil {
 		return nil, err
@@ -112,23 +155,26 @@ func (sgc *SimGridClient) GetNextRound(id string, prev config.Round) (*config.Ro
 		return nil, err
 	}
 
-	championship := Championship{}
-	err = json.Unmarshal(data, &championship)
+	var champ Championship
+	if err := json.Unmarshal(data, &champ); err != nil {
+		return nil, err
+	}
+	return &champ, nil
+}
+
+func (sgc *SimGridClient) GetNextRound(id string, prev config.Round) (*config.Round, error) {
+	championship, err := sgc.GetChampionship(id)
 	if err != nil {
 		return nil, err
 	}
+
 	nextRoundNum := prev.Number + 1
 	nextTrack := ""
 	if len(championship.Races) >= nextRoundNum {
 		nextTrack = championship.Races[nextRoundNum-1].Track.Name
 	}
 
-	nextRound := config.Round{
-		Number: nextRoundNum,
-		Track:  nextTrack,
-	}
-	return &nextRound, nil
-
+	return &config.Round{Number: nextRoundNum, Track: nextTrack}, nil
 }
 
 func (sgc *SimGridClient) BuildDriverLookup(id string) (models.DriverLookup, error) {

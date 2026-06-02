@@ -158,6 +158,61 @@ var _ = Describe("SimGridClient", func() {
 		})
 	})
 
+	Describe("ListUpcomingChampionships", func() {
+		It("returns the parsed list of id/name items", func() {
+			mux.HandleFunc("/championships", func(w http.ResponseWriter, r *http.Request) {
+				Expect(r.URL.Query().Get("status")).To(Equal("upcoming"))
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`[{"id":24877,"name":"GT4 Rookies - Summer"},{"id":24879,"name":"Multiclass Open - Summer"}]`))
+			})
+
+			items, err := client.ListUpcomingChampionships()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(items).To(HaveLen(2))
+			Expect(items[0].ID).To(Equal(24877))
+			Expect(items[0].Name).To(Equal("GT4 Rookies - Summer"))
+		})
+
+		It("returns an error on HTTP failure", func() {
+			mux.HandleFunc("/championships", func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "boom", http.StatusInternalServerError)
+			})
+			_, err := client.ListUpcomingChampionships()
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Describe("GetChampionship", func() {
+		It("returns the parsed detail including host and start date", func() {
+			mux.HandleFunc("/championships/24877", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id":24877,"name":"GT4 Rookies - Summer","host_name":"TRACKILICIOUS","start_date":"2026-06-08T23:45:00.000Z","races":[{"track":{"name":"Misano"}}]}`))
+			})
+
+			champ, err := client.GetChampionship("24877")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(champ.ID).To(Equal(24877))
+			Expect(champ.Name).To(Equal("GT4 Rookies - Summer"))
+			Expect(champ.HostName).To(Equal("TRACKILICIOUS"))
+			Expect(champ.Races[0].Track.Name).To(Equal("Misano"))
+		})
+	})
+
+	Describe("Championship.StartYear", func() {
+		It("parses the RFC3339 start date into a year", func() {
+			champ := simgrid.Championship{StartDate: "2026-06-08T23:45:00.000Z"}
+			year, err := champ.StartYear()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(year).To(Equal(2026))
+		})
+
+		It("returns an error for an unparseable start date", func() {
+			champ := simgrid.Championship{StartDate: "not-a-date"}
+			_, err := champ.StartYear()
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	Describe("BuildDriverLookup", func() {
 		BeforeEach(func() {
 			mux.HandleFunc("/championships/champ1/participating_users", func(w http.ResponseWriter, r *http.Request) {
