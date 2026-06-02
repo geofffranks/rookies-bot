@@ -44,7 +44,7 @@ var _ = Describe("Runner.before", func() {
 			newGCloudClient: func(_ context.Context) (*gcloud.Client, error) {
 				return nil, nil
 			},
-			newDiscordClient: func(_ *config.Config, _ *gcloud.Client) (discord.BotDiscordClient, error) {
+			newDiscordClient: func(_ *config.Config, _ *gcloud.Client, _ string) (discord.BotDiscordClient, error) {
 				return fakeDC, nil
 			},
 		}
@@ -70,7 +70,7 @@ var _ = Describe("Runner.before", func() {
 	})
 
 	It("returns an error wrapping 'failed to connect to discord' when discord creation fails", func() {
-		r.newDiscordClient = func(_ *config.Config, _ *gcloud.Client) (discord.BotDiscordClient, error) {
+		r.newDiscordClient = func(_ *config.Config, _ *gcloud.Client, _ string) (discord.BotDiscordClient, error) {
 			return nil, errors.New("bad token")
 		}
 		err := r.before(cCtx)

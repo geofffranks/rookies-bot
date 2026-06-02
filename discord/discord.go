@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/geofffranks/rookies-bot/config"
@@ -56,6 +57,8 @@ type DiscordClient struct {
 	guild         snowflake.ID
 	memberList    map[string]snowflake.ID
 	gcloud        *gcloud.Client
+	configPath    string
+	mu            sync.Mutex
 }
 
 func downloadAttachment(url string) ([]byte, error) {
@@ -377,7 +380,7 @@ func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
 	}
 }
 
-func NewDiscordClient(conf *config.Config, gc *gcloud.Client) (*DiscordClient, error) {
+func NewDiscordClient(conf *config.Config, gc *gcloud.Client, configPath string) (*DiscordClient, error) {
 	client, err := disgo.New(conf.DiscordToken, bot.WithGatewayConfigOpts(
 		gateway.WithIntents(gateway.IntentMessageContent, gateway.IntentDirectMessages),
 	))
@@ -391,6 +394,7 @@ func NewDiscordClient(conf *config.Config, gc *gcloud.Client) (*DiscordClient, e
 		rest:          client.Rest(),
 		applicationID: client.ApplicationID(),
 		gcloud:        gc,
+		configPath:    configPath,
 	}
 
 	client.AddEventListeners(bot.NewListenerFunc(dc.onMessageCreate))

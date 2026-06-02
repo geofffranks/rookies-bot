@@ -19,7 +19,7 @@ type Runner struct {
 	dc               discord.BotDiscordClient
 	loadConfig       func(string, string) (*config.Config, error)
 	newGCloudClient  func(context.Context) (*gcloud.Client, error)
-	newDiscordClient func(*config.Config, *gcloud.Client) (discord.BotDiscordClient, error)
+	newDiscordClient func(*config.Config, *gcloud.Client, string) (discord.BotDiscordClient, error)
 	// stopChan is used to unblock the bot; nil means use os.Interrupt.
 	stopChan chan os.Signal
 }
@@ -28,8 +28,8 @@ func newRunner() *Runner {
 	return &Runner{
 		loadConfig:      config.Load,
 		newGCloudClient: gcloud.NewClient,
-		newDiscordClient: func(conf *config.Config, gc *gcloud.Client) (discord.BotDiscordClient, error) {
-			return discord.NewDiscordClient(conf, gc)
+		newDiscordClient: func(conf *config.Config, gc *gcloud.Client, configPath string) (discord.BotDiscordClient, error) {
+			return discord.NewDiscordClient(conf, gc, configPath)
 		},
 	}
 }
@@ -47,7 +47,7 @@ func (r *Runner) before(cCtx *cli.Context) error {
 		return fmt.Errorf("failed to connect to Google APIs: %s", err)
 	}
 
-	r.dc, err = r.newDiscordClient(r.conf, gc)
+	r.dc, err = r.newDiscordClient(r.conf, gc, cCtx.String("config"))
 	if err != nil {
 		return fmt.Errorf("failed to connect to discord: %s", err)
 	}
