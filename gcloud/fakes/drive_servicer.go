@@ -26,6 +26,50 @@ type FakeDriveServicer struct {
 		result1 *drive.File
 		result2 error
 	}
+	CreateFolderStub        func(context.Context, string, string) (*drive.File, error)
+	createFolderMutex       sync.RWMutex
+	createFolderArgsForCall []struct {
+		arg1 context.Context
+		arg2 string
+		arg3 string
+	}
+	createFolderReturns struct {
+		result1 *drive.File
+		result2 error
+	}
+	createFolderReturnsOnCall map[int]struct {
+		result1 *drive.File
+		result2 error
+	}
+	FindFolderStub        func(context.Context, string, string) (*drive.File, error)
+	findFolderMutex       sync.RWMutex
+	findFolderArgsForCall []struct {
+		arg1 context.Context
+		arg2 string
+		arg3 string
+	}
+	findFolderReturns struct {
+		result1 *drive.File
+		result2 error
+	}
+	findFolderReturnsOnCall map[int]struct {
+		result1 *drive.File
+		result2 error
+	}
+	GetFileStub        func(context.Context, string) (*drive.File, error)
+	getFileMutex       sync.RWMutex
+	getFileArgsForCall []struct {
+		arg1 context.Context
+		arg2 string
+	}
+	getFileReturns struct {
+		result1 *drive.File
+		result2 error
+	}
+	getFileReturnsOnCall map[int]struct {
+		result1 *drive.File
+		result2 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -92,6 +136,203 @@ func (fake *FakeDriveServicer) CopyFileReturnsOnCall(i int, result1 *drive.File,
 		})
 	}
 	fake.copyFileReturnsOnCall[i] = struct {
+		result1 *drive.File
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeDriveServicer) CreateFolder(arg1 context.Context, arg2 string, arg3 string) (*drive.File, error) {
+	fake.createFolderMutex.Lock()
+	ret, specificReturn := fake.createFolderReturnsOnCall[len(fake.createFolderArgsForCall)]
+	fake.createFolderArgsForCall = append(fake.createFolderArgsForCall, struct {
+		arg1 context.Context
+		arg2 string
+		arg3 string
+	}{arg1, arg2, arg3})
+	stub := fake.CreateFolderStub
+	fakeReturns := fake.createFolderReturns
+	fake.recordInvocation("CreateFolder", []interface{}{arg1, arg2, arg3})
+	fake.createFolderMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeDriveServicer) CreateFolderCallCount() int {
+	fake.createFolderMutex.RLock()
+	defer fake.createFolderMutex.RUnlock()
+	return len(fake.createFolderArgsForCall)
+}
+
+func (fake *FakeDriveServicer) CreateFolderCalls(stub func(context.Context, string, string) (*drive.File, error)) {
+	fake.createFolderMutex.Lock()
+	defer fake.createFolderMutex.Unlock()
+	fake.CreateFolderStub = stub
+}
+
+func (fake *FakeDriveServicer) CreateFolderArgsForCall(i int) (context.Context, string, string) {
+	fake.createFolderMutex.RLock()
+	defer fake.createFolderMutex.RUnlock()
+	argsForCall := fake.createFolderArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeDriveServicer) CreateFolderReturns(result1 *drive.File, result2 error) {
+	fake.createFolderMutex.Lock()
+	defer fake.createFolderMutex.Unlock()
+	fake.CreateFolderStub = nil
+	fake.createFolderReturns = struct {
+		result1 *drive.File
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeDriveServicer) CreateFolderReturnsOnCall(i int, result1 *drive.File, result2 error) {
+	fake.createFolderMutex.Lock()
+	defer fake.createFolderMutex.Unlock()
+	fake.CreateFolderStub = nil
+	if fake.createFolderReturnsOnCall == nil {
+		fake.createFolderReturnsOnCall = make(map[int]struct {
+			result1 *drive.File
+			result2 error
+		})
+	}
+	fake.createFolderReturnsOnCall[i] = struct {
+		result1 *drive.File
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeDriveServicer) FindFolder(arg1 context.Context, arg2 string, arg3 string) (*drive.File, error) {
+	fake.findFolderMutex.Lock()
+	ret, specificReturn := fake.findFolderReturnsOnCall[len(fake.findFolderArgsForCall)]
+	fake.findFolderArgsForCall = append(fake.findFolderArgsForCall, struct {
+		arg1 context.Context
+		arg2 string
+		arg3 string
+	}{arg1, arg2, arg3})
+	stub := fake.FindFolderStub
+	fakeReturns := fake.findFolderReturns
+	fake.recordInvocation("FindFolder", []interface{}{arg1, arg2, arg3})
+	fake.findFolderMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeDriveServicer) FindFolderCallCount() int {
+	fake.findFolderMutex.RLock()
+	defer fake.findFolderMutex.RUnlock()
+	return len(fake.findFolderArgsForCall)
+}
+
+func (fake *FakeDriveServicer) FindFolderCalls(stub func(context.Context, string, string) (*drive.File, error)) {
+	fake.findFolderMutex.Lock()
+	defer fake.findFolderMutex.Unlock()
+	fake.FindFolderStub = stub
+}
+
+func (fake *FakeDriveServicer) FindFolderArgsForCall(i int) (context.Context, string, string) {
+	fake.findFolderMutex.RLock()
+	defer fake.findFolderMutex.RUnlock()
+	argsForCall := fake.findFolderArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeDriveServicer) FindFolderReturns(result1 *drive.File, result2 error) {
+	fake.findFolderMutex.Lock()
+	defer fake.findFolderMutex.Unlock()
+	fake.FindFolderStub = nil
+	fake.findFolderReturns = struct {
+		result1 *drive.File
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeDriveServicer) FindFolderReturnsOnCall(i int, result1 *drive.File, result2 error) {
+	fake.findFolderMutex.Lock()
+	defer fake.findFolderMutex.Unlock()
+	fake.FindFolderStub = nil
+	if fake.findFolderReturnsOnCall == nil {
+		fake.findFolderReturnsOnCall = make(map[int]struct {
+			result1 *drive.File
+			result2 error
+		})
+	}
+	fake.findFolderReturnsOnCall[i] = struct {
+		result1 *drive.File
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeDriveServicer) GetFile(arg1 context.Context, arg2 string) (*drive.File, error) {
+	fake.getFileMutex.Lock()
+	ret, specificReturn := fake.getFileReturnsOnCall[len(fake.getFileArgsForCall)]
+	fake.getFileArgsForCall = append(fake.getFileArgsForCall, struct {
+		arg1 context.Context
+		arg2 string
+	}{arg1, arg2})
+	stub := fake.GetFileStub
+	fakeReturns := fake.getFileReturns
+	fake.recordInvocation("GetFile", []interface{}{arg1, arg2})
+	fake.getFileMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeDriveServicer) GetFileCallCount() int {
+	fake.getFileMutex.RLock()
+	defer fake.getFileMutex.RUnlock()
+	return len(fake.getFileArgsForCall)
+}
+
+func (fake *FakeDriveServicer) GetFileCalls(stub func(context.Context, string) (*drive.File, error)) {
+	fake.getFileMutex.Lock()
+	defer fake.getFileMutex.Unlock()
+	fake.GetFileStub = stub
+}
+
+func (fake *FakeDriveServicer) GetFileArgsForCall(i int) (context.Context, string) {
+	fake.getFileMutex.RLock()
+	defer fake.getFileMutex.RUnlock()
+	argsForCall := fake.getFileArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeDriveServicer) GetFileReturns(result1 *drive.File, result2 error) {
+	fake.getFileMutex.Lock()
+	defer fake.getFileMutex.Unlock()
+	fake.GetFileStub = nil
+	fake.getFileReturns = struct {
+		result1 *drive.File
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeDriveServicer) GetFileReturnsOnCall(i int, result1 *drive.File, result2 error) {
+	fake.getFileMutex.Lock()
+	defer fake.getFileMutex.Unlock()
+	fake.GetFileStub = nil
+	if fake.getFileReturnsOnCall == nil {
+		fake.getFileReturnsOnCall = make(map[int]struct {
+			result1 *drive.File
+			result2 error
+		})
+	}
+	fake.getFileReturnsOnCall[i] = struct {
 		result1 *drive.File
 		result2 error
 	}{result1, result2}

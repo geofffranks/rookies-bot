@@ -18,4 +18,7 @@ type DocsServicer interface {
 //counterfeiter:generate . DriveServicer
 type DriveServicer interface {
 	CopyFile(ctx context.Context, templateID, folderID, title string) (*drive.File, error)
+	GetFile(ctx context.Context, id string) (*drive.File, error)
+	FindFolder(ctx context.Context, parentID, name string) (*drive.File, error)
+	CreateFolder(ctx context.Context, parentID, name string) (*drive.File, error)
 }

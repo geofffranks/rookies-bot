@@ -55,6 +55,32 @@ func (r *realDriveService) CopyFile(ctx context.Context, templateID, folderID, t
 	}).Context(ctx).Do()
 }
 
+func (r *realDriveService) GetFile(ctx context.Context, id string) (*drive.File, error) {
+	return r.svc.Files.Get(id).Fields("id, name, parents").Context(ctx).Do()
+}
+
+func (r *realDriveService) FindFolder(ctx context.Context, parentID, name string) (*drive.File, error) {
+	escaped := strings.ReplaceAll(name, "'", `\'`)
+	q := fmt.Sprintf("'%s' in parents and name = '%s' and mimeType = 'application/vnd.google-apps.folder' and trashed = false", parentID, escaped)
+	list, err := r.svc.Files.List().Q(q).Fields("files(id, name)").Context(ctx).Do()
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Files) == 0 {
+		return nil, nil
+	}
+	return list.Files[0], nil
+}
+
+func (r *realDriveService) CreateFolder(ctx context.Context, parentID, name string) (*drive.File, error) {
+	folder := &drive.File{
+		Name:     name,
+		Parents:  []string{parentID},
+		MimeType: "application/vnd.google-apps.folder",
+	}
+	return r.svc.Files.Create(folder).Fields("id").Context(ctx).Do()
+}
+
 // --- Methods ---
 
 func (c *Client) GenerateBriefing(conf *config.Config, penalties *models.Penalties) (string, error) {
