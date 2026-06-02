@@ -97,6 +97,14 @@ var _ = Describe("helpMessage", func() {
 	It("notes that the penalty commands require a YAML attachment", func() {
 		Expect(helpMessage()).To(ContainSubstring("YAML"))
 	})
+
+	It("lists the !new-season command", func() {
+		Expect(helpMessage()).To(ContainSubstring("!new-season"))
+	})
+
+	It("lists the !new-season-apply command", func() {
+		Expect(helpMessage()).To(ContainSubstring("!new-season-apply"))
+	})
 })
 
 var _ = Describe("buildPenalizedDriverList", func() {

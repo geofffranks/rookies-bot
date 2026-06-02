@@ -214,7 +214,11 @@ func helpMessage() string {
 		"`!announce-penalties`\n" +
 		"  Attach a round penalty YAML; posts the formatted penalty breakdown (quali bans / pit starts, R1 & R2).\n\n" +
 		"`!race-setup`\n" +
-		"  Attach a round penalty YAML; generates the next round config and race-day setup.\n"
+		"  Attach a round penalty YAML; generates the next round config and race-day setup.\n\n" +
+		"`!new-season`\n" +
+		"  Preview the next-season reconfiguration (championship, schedule, config values). Makes no changes.\n\n" +
+		"`!new-season-apply`\n" +
+		"  Apply the next-season reconfiguration: create Drive folders, update the bot config live, and post the round-0 config.\n"
 }
 
 func sendBotResponse(event *events.MessageCreate, msg, attachment string) {
