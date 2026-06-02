@@ -196,6 +196,14 @@ var _ = Describe("SimGridClient", func() {
 			Expect(champ.HostName).To(Equal("TRACKILICIOUS"))
 			Expect(champ.Races[0].Track.Name).To(Equal("Misano"))
 		})
+
+		It("returns an error on HTTP failure", func() {
+			mux.HandleFunc("/championships/24877", func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "boom", http.StatusInternalServerError)
+			})
+			_, err := client.GetChampionship("24877")
+			Expect(err).To(HaveOccurred())
+		})
 	})
 
 	Describe("Championship.StartYear", func() {
