@@ -3,12 +3,12 @@ module github.com/geofffranks/rookies-bot
 go 1.25.8
 
 require (
-	github.com/disgoorg/disgo v0.19.3
+	github.com/disgoorg/disgo v0.19.4
 	github.com/disgoorg/snowflake/v2 v2.0.3
 	github.com/onsi/ginkgo/v2 v2.29.0
 	github.com/onsi/gomega v1.41.0
 	github.com/urfave/cli/v2 v2.27.7
-	google.golang.org/api v0.282.0
+	google.golang.org/api v0.283.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
