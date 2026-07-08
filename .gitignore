@@ -9,3 +9,6 @@ winter-round-1.yaml
 coverage.out
 rookies-bot
 vendor/**/.gitignore
+.claude/settings.json*
+.DS_Store
+docs/superpowers
