@@ -8,7 +8,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
 	github.com/urfave/cli/v2 v2.27.7
-	google.golang.org/api v0.287.1
+	google.golang.org/api v0.288.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
