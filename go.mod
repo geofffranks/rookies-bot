@@ -1,6 +1,6 @@
 module github.com/geofffranks/rookies-bot
 
-go 1.25.8
+go 1.26.0
 
 require (
 	github.com/disgoorg/disgo v0.19.6
@@ -8,7 +8,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.43.0
 	github.com/urfave/cli/v2 v2.27.7
-	google.golang.org/api v0.295.0
+	google.golang.org/api v0.297.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
