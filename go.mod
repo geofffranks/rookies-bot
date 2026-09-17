@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/disgoorg/disgo v0.19.6
 	github.com/disgoorg/snowflake/v2 v2.0.3
-	github.com/onsi/ginkgo/v2 v2.32.1
+	github.com/onsi/ginkgo/v2 v2.32.2
 	github.com/onsi/gomega v1.43.0
 	github.com/urfave/cli/v2 v2.27.7
 	google.golang.org/api v0.297.0
