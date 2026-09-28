@@ -74,12 +74,24 @@ type ChampionshipListItem struct {
 	Name string `json:"name"`
 }
 
+// championshipsIndexResp is the {"data": [...], "pagination": {...}} envelope
+// the championships index endpoint wraps its list in.
+type championshipsIndexResp struct {
+	Data []ChampionshipListItem `json:"data"`
+}
+
 type User struct {
 	FirstName     string `json:"first_name"`
 	LastName      string `json:"last_name"`
 	SteamID       string `json:"steam64_id"`
 	DiscordHandle string `json:"username"`
 	CarNumber     int
+}
+
+// participatingUsersResp is the {"data": [...], "pagination": null} envelope
+// the participating_users endpoint wraps its list in.
+type participatingUsersResp struct {
+	Data []User `json:"data"`
 }
 
 func (sgc *SimGridClient) GetEntriesForChampionship(id string) ([]Entry, error) {
@@ -115,18 +127,18 @@ func (sgc *SimGridClient) UsersForChampionship(id string) ([]User, error) {
 		return nil, err
 	}
 
-	users := []User{}
-	err = json.Unmarshal(data, &users)
-	if err != nil {
+	var body participatingUsersResp
+	if err := json.Unmarshal(data, &body); err != nil {
 		return nil, err
 	}
-	return users, nil
+	return body.Data, nil
 }
 
 // ListUpcomingChampionships returns all upcoming multi-race championships
-// (id + name only).
+// (id + name only). The index is paginated (default limit 10), so request a
+// large page instead of silently missing championships beyond page 1.
 func (sgc *SimGridClient) ListUpcomingChampionships() ([]ChampionshipListItem, error) {
-	resp, err := sgc.makeRequest("GET", "/championships?status=upcoming&races_count=full_championships")
+	resp, err := sgc.makeRequest("GET", "/championships?status=upcoming&races_count=full_championships&limit=100")
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +149,11 @@ func (sgc *SimGridClient) ListUpcomingChampionships() ([]ChampionshipListItem, e
 		return nil, err
 	}
 
-	var items []ChampionshipListItem
-	if err := json.Unmarshal(data, &items); err != nil {
+	var body championshipsIndexResp
+	if err := json.Unmarshal(data, &body); err != nil {
 		return nil, err
 	}
-	return items, nil
+	return body.Data, nil
 }
 
 // GetChampionship returns the full detail for a single championship.

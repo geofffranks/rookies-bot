@@ -397,7 +397,7 @@ var _ = Describe("runAnnouncePenalties", func() {
 			if strings.Contains(r.URL.Path, "entrylist") {
 				_, _ = w.Write([]byte(`{"entries":[]}`))
 			} else {
-				_, _ = w.Write([]byte(`[]`))
+				_, _ = w.Write([]byte(`{"data":[]}`))
 			}
 		}))
 		sgClient = simgrid.NewClient("test-token")
@@ -433,7 +433,7 @@ var _ = Describe("runAnnouncePenalties", func() {
 			if strings.Contains(r.URL.Path, "entrylist") {
 				_, _ = w.Write([]byte(`{"entries":[{"drivers":[{"firstName":"Test","lastName":"Driver","playerId":"S123"}],"raceNumber":1}]}`))
 			} else {
-				_, _ = w.Write([]byte(`[{"steam64_id":"123","username":"testdriver"}]`))
+				_, _ = w.Write([]byte(`{"data":[{"steam64_id":"123","username":"testdriver"}]}`))
 			}
 		})
 		stub.getMembersFn = func(guildID snowflake.ID, limit int, after snowflake.ID, opts ...rest.RequestOpt) ([]dgo.Member, error) {
@@ -556,7 +556,7 @@ var _ = Describe("runRaceSetup", func() {
 			if strings.Contains(r.URL.Path, "entrylist") {
 				_, _ = w.Write([]byte(`{"entries":[]}`))
 			} else {
-				_, _ = w.Write([]byte(`[]`))
+				_, _ = w.Write([]byte(`{"data":[]}`))
 			}
 		}))
 		sgClient = simgrid.NewClient("test-token")
@@ -599,7 +599,7 @@ var _ = Describe("runRaceSetup", func() {
 				_, _ = w.Write([]byte(`{"entries":[]}`))
 			} else if strings.Contains(r.URL.Path, "participating_users") {
 				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(`[]`))
+				_, _ = w.Write([]byte(`{"data":[]}`))
 			} else {
 				// Championships endpoint fails
 				w.WriteHeader(http.StatusInternalServerError)
@@ -669,7 +669,7 @@ var _ = Describe("runRaceSetup", func() {
 			if strings.Contains(r.URL.Path, "entrylist") {
 				_, _ = w.Write([]byte(`{"entries":[]}`))
 			} else if strings.Contains(r.URL.Path, "participating_users") {
-				_, _ = w.Write([]byte(`[]`))
+				_, _ = w.Write([]byte(`{"data":[]}`))
 			} else {
 				// Default case: championships endpoint for GetNextRound
 				_, _ = w.Write([]byte(`{"races":[{"track":{"name":"Round1"}},{"track":{"name":"Round2"}},{"track":{"name":"Silverstone"}}]}`))
@@ -695,7 +695,7 @@ var _ = Describe("runRaceSetup", func() {
 			if strings.Contains(r.URL.Path, "entrylist") {
 				_, _ = w.Write([]byte(`{"entries":[{"drivers":[{"firstName":"Test","lastName":"Driver","playerId":"S999"}],"raceNumber":99}]}`))
 			} else {
-				_, _ = w.Write([]byte(`[{"steam64_id":"999","username":"testdriver"}]`))
+				_, _ = w.Write([]byte(`{"data":[{"steam64_id":"999","username":"testdriver"}]}`))
 			}
 		})
 		roundConfig.Penalties.QualiBansR1 = []int{99}
@@ -719,7 +719,7 @@ var _ = Describe("runRaceSetup", func() {
 			if strings.Contains(r.URL.Path, "entrylist") {
 				_, _ = w.Write([]byte(`{"entries":[]}`))
 			} else if strings.Contains(r.URL.Path, "participating_users") {
-				_, _ = w.Write([]byte(`[]`))
+				_, _ = w.Write([]byte(`{"data":[]}`))
 			} else {
 				_, _ = w.Write([]byte(`{"races":[{"track":{"name":"Round1"}},{"track":{"name":"Round2"}},{"track":{"name":"Silverstone"}}]}`))
 			}
@@ -924,7 +924,7 @@ var _ = Describe("runNewSeason preview", func() {
 			w.Header().Set("Content-Type", "application/json")
 			switch r.URL.Path {
 			case "/championships":
-				_, _ = w.Write([]byte(`[{"id":555,"name":"GT4 Rookies - Winter"}]`))
+				_, _ = w.Write([]byte(`{"data":[{"id":555,"name":"GT4 Rookies - Winter"}],"pagination":{"limit":100,"offset":0}}`))
 			case "/championships/555":
 				_, _ = w.Write([]byte(`{"id":555,"name":"GT4 Rookies - Winter","host_name":"TRACKILICIOUS","start_date":"2026-12-01T00:00:00.000Z","races":[{"track":{"name":"Bathurst"}},{"track":{"name":"Spa"}}]}`))
 			default:
@@ -1026,7 +1026,7 @@ discord_token: keep-me-secret
 			w.Header().Set("Content-Type", "application/json")
 			switch r.URL.Path {
 			case "/championships":
-				_, _ = w.Write([]byte(`[{"id":555,"name":"GT4 Rookies - Winter"}]`))
+				_, _ = w.Write([]byte(`{"data":[{"id":555,"name":"GT4 Rookies - Winter"}],"pagination":{"limit":100,"offset":0}}`))
 			case "/championships/555":
 				_, _ = w.Write([]byte(`{"id":555,"name":"GT4 Rookies - Winter","host_name":"TRACKILICIOUS","start_date":"2026-12-01T00:00:00.000Z","races":[{"track":{"name":"Bathurst"}}]}`))
 			default:

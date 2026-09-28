@@ -82,9 +82,7 @@ var _ = Describe("SimGridClient", func() {
 		It("returns parsed users on success", func() {
 			mux.HandleFunc("/championships/champ1/participating_users", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode([]simgrid.User{
-					{FirstName: "Lewis", LastName: "H", SteamID: "9999", DiscordHandle: "lewis"},
-				})
+				_, _ = w.Write([]byte(`{"data":[{"first_name":"Lewis","last_name":"H","steam64_id":"9999","username":"lewis"}]}`))
 			})
 
 			users, err := client.UsersForChampionship("champ1")
@@ -162,8 +160,9 @@ var _ = Describe("SimGridClient", func() {
 		It("returns the parsed list of id/name items", func() {
 			mux.HandleFunc("/championships", func(w http.ResponseWriter, r *http.Request) {
 				Expect(r.URL.Query().Get("status")).To(Equal("upcoming"))
+				Expect(r.URL.Query().Get("limit")).To(Equal("100"))
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`[{"id":24877,"name":"GT4 Rookies - Summer"},{"id":24879,"name":"Multiclass Open - Summer"}]`))
+				_, _ = w.Write([]byte(`{"data":[{"id":24877,"name":"GT4 Rookies - Summer"},{"id":24879,"name":"Multiclass Open - Summer"}],"pagination":{"limit":100,"offset":0}}`))
 			})
 
 			items, err := client.ListUpcomingChampionships()
@@ -225,10 +224,9 @@ var _ = Describe("SimGridClient", func() {
 		BeforeEach(func() {
 			mux.HandleFunc("/championships/champ1/participating_users", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode([]simgrid.User{
-					{FirstName: "Max", LastName: "V", SteamID: "111", DiscordHandle: "maxv"},
-					{FirstName: "Lewis", LastName: "H", SteamID: "222", DiscordHandle: "lewish"},
-				})
+				_, _ = w.Write([]byte(`{"data":[` +
+					`{"first_name":"Max","last_name":"V","steam64_id":"111","username":"maxv"},` +
+					`{"first_name":"Lewis","last_name":"H","steam64_id":"222","username":"lewish"}]}`))
 			})
 		})
 
@@ -300,12 +298,12 @@ var _ = Describe("SimGridClient", func() {
 		BeforeEach(func() {
 			mux.HandleFunc("/championships", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`[
+				_, _ = w.Write([]byte(`{"data":[
 					{"id":1,"name":"TRACKILICIOUS - GT3 - Summer Sprint Series"},
 					{"id":2,"name":"GT4 Rookies - Summer"},
 					{"id":3,"name":"GT4 Rookies - Winter"},
 					{"id":4,"name":"Some Other Org Rookies - Summer"}
-				]`))
+				],"pagination":{"limit":100,"offset":0}}`))
 			})
 			mux.HandleFunc("/championships/2", func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte(`{"id":2,"name":"GT4 Rookies - Summer","host_name":"TRACKILICIOUS","start_date":"2026-06-08T00:00:00.000Z","races":[{"track":{"name":"Misano"}}]}`))
@@ -343,7 +341,7 @@ var _ = Describe("SimGridClient", func() {
 	Describe("FindSeasonChampionship with multiple matches", func() {
 		It("returns an error listing the ambiguous matches", func() {
 			mux.HandleFunc("/championships", func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write([]byte(`[{"id":10,"name":"GT4 Rookies - Summer A"},{"id":11,"name":"GT4 Rookies - Summer B"}]`))
+				_, _ = w.Write([]byte(`{"data":[{"id":10,"name":"GT4 Rookies - Summer A"},{"id":11,"name":"GT4 Rookies - Summer B"}],"pagination":{"limit":100,"offset":0}}`))
 			})
 			mux.HandleFunc("/championships/10", func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte(`{"id":10,"name":"GT4 Rookies - Summer A","host_name":"TRACKILICIOUS","start_date":"2026-06-08T00:00:00.000Z","races":[]}`))
