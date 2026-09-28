@@ -160,6 +160,7 @@ var _ = Describe("SimGridClient", func() {
 		It("returns the parsed list of id/name items", func() {
 			mux.HandleFunc("/championships", func(w http.ResponseWriter, r *http.Request) {
 				Expect(r.URL.Query().Get("status")).To(Equal("upcoming"))
+				Expect(r.URL.Query().Get("races_count")).To(Equal("full_championships"))
 				Expect(r.URL.Query().Get("limit")).To(Equal("100"))
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(`{"data":[{"id":24877,"name":"GT4 Rookies - Summer"},{"id":24879,"name":"Multiclass Open - Summer"}],"pagination":{"limit":100,"offset":0}}`))
@@ -254,15 +255,17 @@ var _ = Describe("SimGridClient", func() {
 				json.NewEncoder(w).Encode(simgrid.EntryListResp{
 					Entries: []simgrid.Entry{
 						{CarNumber: 33, Drivers: []simgrid.Driver{
-							{FirstName: "", LastName: "", PlayerID: "S111"},
+							// PlayerID S999 is absent from the participating_users stub:
+							// if the blank-name skip regresses, the lookup fails with
+							// "unknown driver" and this spec errors.
+							{FirstName: "", LastName: "", PlayerID: "S999"},
 						}},
 					},
 				})
 			})
 
-			lookup, err := client.BuildDriverLookup("champ1")
+			_, err := client.BuildDriverLookup("champ1")
 			Expect(err).NotTo(HaveOccurred())
-			_ = lookup
 		})
 
 		It("returns an error when an entry driver is not in the user list", func() {
