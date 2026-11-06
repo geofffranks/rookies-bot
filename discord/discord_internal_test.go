@@ -940,7 +940,7 @@ var _ = Describe("runNewSeason preview", func() {
 	})
 
 	It("returns a preview describing the championship, computed values, and how to apply", func() {
-		msg, attachment, err := client.runNewSeason(false, sgClient)
+		msg, attachment, err := client.runNewSeason(false, "", sgClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(attachment).To(BeEmpty())
 
@@ -953,20 +953,20 @@ var _ = Describe("runNewSeason preview", func() {
 	})
 
 	It("makes no changes in preview mode (config file path never touched)", func() {
-		_, _, err := client.runNewSeason(false, sgClient)
+		_, _, err := client.runNewSeason(false, "", sgClient)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("returns an error when the current season cannot be parsed", func() {
 		client.conf.Season = "Autumn"
-		_, _, err := client.runNewSeason(false, sgClient)
+		_, _, err := client.runNewSeason(false, "", sgClient)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("could not determine current season"))
 	})
 
 	It("returns an error when no matching championship is found", func() {
 		client.conf.Season = "Summer" // next term = Fall, which the server does not offer
-		_, _, err := client.runNewSeason(false, sgClient)
+		_, _, err := client.runNewSeason(false, "", sgClient)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("no upcoming"))
 	})
@@ -1026,9 +1026,11 @@ discord_token: keep-me-secret
 			w.Header().Set("Content-Type", "application/json")
 			switch r.URL.Path {
 			case "/championships":
-				_, _ = w.Write([]byte(`{"data":[{"id":555,"name":"GT4 Rookies - Winter"}],"pagination":{"limit":100,"offset":0}}`))
+				_, _ = w.Write([]byte(`{"data":[{"id":555,"name":"GT4 Rookies - Winter"},{"id":556,"name":"GT4 Rookies - Fall"}],"pagination":{"limit":100,"offset":0}}`))
 			case "/championships/555":
 				_, _ = w.Write([]byte(`{"id":555,"name":"GT4 Rookies - Winter","host_name":"TRACKILICIOUS","start_date":"2026-12-01T00:00:00.000Z","races":[{"track":{"name":"Bathurst"}}]}`))
+			case "/championships/556":
+				_, _ = w.Write([]byte(`{"id":556,"name":"GT4 Rookies - Fall","host_name":"TRACKILICIOUS","start_date":"2027-09-01T00:00:00.000Z","races":[{"track":{"name":"Monza"}}]}`))
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -1044,7 +1046,7 @@ discord_token: keep-me-secret
 	})
 
 	It("creates folders, rewrites config, updates live config, and attaches round-0", func() {
-		msg, attachment, err := client.runNewSeason(true, sgClient)
+		msg, attachment, err := client.runNewSeason(true, "", sgClient)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(fakeDrive.CreateFolderCallCount()).To(Equal(2))
@@ -1071,9 +1073,26 @@ discord_token: keep-me-secret
 		Expect(msg).To(ContainSubstring("!race-setup"))
 	})
 
+	It("applies the explicitly selected term end to end", func() {
+		msg, attachment, err := client.runNewSeason(true, "Fall", sgClient)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(client.conf.Season).To(Equal("2027 Fall"))
+		Expect(client.conf.ChampionshipId).To(Equal("556"))
+		Expect(client.conf.DiscordRoleName).To(Equal("GT4 Rookies Fall"))
+
+		data, err := os.ReadFile(configPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(data)).To(ContainSubstring("2027 Fall"))
+		Expect(string(data)).To(ContainSubstring("GT4 Rookies Fall"))
+
+		Expect(attachment).To(Equal("2027-fall-round-0.yml"))
+		Expect(msg).To(ContainSubstring("2027 Fall"))
+	})
+
 	It("returns an error when folder creation fails (no config written)", func() {
 		fakeDrive.CreateFolderReturnsOnCall(0, nil, fmt.Errorf("drive create failed"))
-		_, _, err := client.runNewSeason(true, sgClient)
+		_, _, err := client.runNewSeason(true, "", sgClient)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("briefing folder"))
 
@@ -1083,7 +1102,7 @@ discord_token: keep-me-secret
 
 	It("does not mutate the live config when the config-file write fails", func() {
 		client.configPath = "/no/such/dir/config.yml"
-		_, _, err := client.runNewSeason(true, sgClient)
+		_, _, err := client.runNewSeason(true, "", sgClient)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("failed updating config file"))
 		Expect(client.conf.Season).To(Equal("Fall"))
@@ -1091,7 +1110,7 @@ discord_token: keep-me-secret
 
 	It("removes the orphaned round-0 file when the config-file write fails", func() {
 		client.configPath = "/no/such/dir/config.yml"
-		_, _, err := client.runNewSeason(true, sgClient)
+		_, _, err := client.runNewSeason(true, "", sgClient)
 		Expect(err).To(HaveOccurred())
 		_, statErr := os.Stat("2026-winter-round-0.yml")
 		Expect(os.IsNotExist(statErr)).To(BeTrue())

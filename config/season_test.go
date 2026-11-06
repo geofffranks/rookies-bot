@@ -67,3 +67,66 @@ var _ = Describe("RoleNameForTerm", func() {
 		Expect(err).To(HaveOccurred())
 	})
 })
+
+var _ = Describe("ParseSeasonSelection", func() {
+	DescribeTable("normalizes supported inputs to the canonical term",
+		func(input, expected string) {
+			term, err := config.ParseSeasonSelection(input)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(term).To(Equal(expected))
+		},
+		Entry("bare lowercase term", "fall", "Fall"),
+		Entry("bare mixed-case term", "Fall", "Fall"),
+		Entry("bare uppercase term", "WINTER", "Winter"),
+		Entry("bare two-word term", "New Year", "New Year"),
+		Entry("lowercase two-word term", "new year", "New Year"),
+		Entry("bare Spring", "Spring", "Spring"),
+		Entry("bare Summer", "Summer", "Summer"),
+		Entry("leading year", "2026 Fall", "Fall"),
+		Entry("surrounding whitespace", "  Fall  ", "Fall"),
+		Entry("role name", "GT4 Rookies Fall", "Fall"),
+		Entry("role name lowercase", "gt4 rookies fall", "Fall"),
+		Entry("role name mixed case", "Gt4 Rookies Winter", "Winter"),
+		Entry("irregular New role alias", "GT4 Rookie New", "New Year"),
+		Entry("irregular Springs role alias", "GT4 Rookies Springs", "Spring"),
+		Entry("role-prefixed canonical term", "GT4 Rookies Spring", "Spring"),
+		Entry("role-prefixed singular rookie", "gt4 rookie fall", "Fall"),
+		Entry("repeated internal whitespace in role name", "GT4   Rookies   Fall", "Fall"),
+		Entry("repeated internal whitespace in two-word term", "New    Year", "New Year"),
+	)
+
+	It("returns no selection for empty input", func() {
+		term, err := config.ParseSeasonSelection("")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(term).To(BeEmpty())
+	})
+
+	It("returns no selection for whitespace-only input", func() {
+		term, err := config.ParseSeasonSelection("   ")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(term).To(BeEmpty())
+	})
+
+	It("rejects an unsupported season with an actionable message", func() {
+		_, err := config.ParseSeasonSelection("Autumn")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("Autumn"))
+		Expect(err.Error()).To(ContainSubstring("New Year"))
+		Expect(err.Error()).To(ContainSubstring("GT4 Rookies Fall"))
+	})
+
+	DescribeTable("rejects year-only nonempty input",
+		func(input string) {
+			_, err := config.ParseSeasonSelection(input)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid season"))
+		},
+		Entry("trailing space", "2026 "),
+		Entry("surrounding whitespace", " 2026\t"),
+	)
+
+	It("rejects a term glued to the role prefix without a space", func() {
+		_, err := config.ParseSeasonSelection("GT4 RookiesFall")
+		Expect(err).To(HaveOccurred())
+	})
+})

@@ -13,8 +13,8 @@ test: lint
 	go run github.com/onsi/ginkgo/v2/ginkgo -r --race --fail-on-pending --keep-going --fail-on-empty --require-suite -p .
 
 build: test
-	docker build --platform linux/amd64 -t gfranks/rookies-bot .
-	docker push gfranks/rookies-bot
+	podman build --platform linux/amd64 -t gfranks/rookies-bot .
+	podman push gfranks/rookies-bot
 	@echo "Run 'make deploy' to push changes to production."
 
 deploy: build

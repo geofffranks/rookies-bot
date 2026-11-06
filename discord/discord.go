@@ -213,11 +213,38 @@ func (d *DiscordClient) onMessageCreate(event *events.MessageCreate) {
 		d.announcePenalties(event)
 	case "!race-setup":
 		d.raceSetup(event)
-	case "!new-season":
-		d.newSeason(event, false)
-	case "!new-season-apply":
-		d.newSeason(event, true)
+	default:
+		if apply, arg, ok := parseSeasonCommand(event.Message.Content); ok {
+			d.newSeason(event, apply, arg)
+		}
 	}
+}
+
+// parseSeasonCommand splits an admin message into one of the two season
+// commands and its optional season argument. ok is true only when the message
+// is exactly "!new-season" or "!new-season-apply", optionally followed by
+// whitespace and the season argument (the complete remainder, quotes not
+// required). Lookalikes such as "!new-season-extra" or "!new-season-applyx"
+// do not match, so they can never trigger setup. The apply token is checked
+// first because it shares the preview token as a prefix.
+func parseSeasonCommand(content string) (apply bool, arg string, ok bool) {
+	for _, cmd := range []struct {
+		token string
+		apply bool
+	}{
+		{"!new-season-apply", true},
+		{"!new-season", false},
+	} {
+		rest, found := strings.CutPrefix(content, cmd.token)
+		if !found {
+			continue
+		}
+		if rest == "" || strings.HasPrefix(rest, " ") || strings.HasPrefix(rest, "\t") {
+			return cmd.apply, rest, true
+		}
+		return false, "", false
+	}
+	return false, "", false
 }
 
 // helpMessage returns the admin-facing command reference posted in response
@@ -230,10 +257,12 @@ func helpMessage() string {
 		"  Attach a round penalty YAML; posts the formatted penalty breakdown (quali bans / pit starts, R1 & R2).\n\n" +
 		"`!race-setup`\n" +
 		"  Attach a round penalty YAML; generates the next round config and race-day setup.\n\n" +
-		"`!new-season`\n" +
-		"  Preview the next-season reconfiguration (championship, schedule, config values). Makes no changes.\n\n" +
-		"`!new-season-apply`\n" +
-		"  Apply the next-season reconfiguration: create Drive folders, update the bot config live, and post the round-0 config.\n"
+		"`!new-season [season]`\n" +
+		"  Preview the next-season reconfiguration (championship, schedule, config values). Makes no changes.\n" +
+		"  With no argument the next season follows the cycle (Winter wraps to New Year). Pass a season to override, e.g. `!new-season Fall` or `!new-season GT4 Rookies Fall` (terms: New Year, Spring, Summer, Fall, Winter; role names work too).\n\n" +
+		"`!new-season-apply [season]`\n" +
+		"  Apply the next-season reconfiguration: create Drive folders, update the bot config live, and post the round-0 config.\n" +
+		"  Takes the same optional season argument; preview with `!new-season Fall`, then commit with `!new-season-apply Fall`.\n"
 }
 
 func sendBotResponse(event *events.MessageCreate, msg, attachment string) {
@@ -410,30 +439,46 @@ func (d *DiscordClient) raceSetup(event *events.MessageCreate) {
 	}
 }
 
-func (d *DiscordClient) newSeason(event *events.MessageCreate, apply bool) {
+// newSimGridClient constructs the SimGrid API client used by the season
+// commands. It is a package-level variable so tests can point it at a stub
+// API server.
+var newSimGridClient = simgrid.NewClient
+
+func (d *DiscordClient) newSeason(event *events.MessageCreate, apply bool, seasonArg string) {
 	var msg, attachment string
 	defer func() { sendBotResponse(event, msg, attachment) }()
 
-	sgClient := simgrid.NewClient(d.snapshotConfig().SimGridApiToken)
-	var err error
-	msg, attachment, err = d.runNewSeason(apply, sgClient)
+	// Validate the season argument before touching SimGrid or any mutating
+	// operation; an invalid argument must never fall back to progression.
+	selectedTerm, err := config.ParseSeasonSelection(seasonArg)
+	if err != nil {
+		msg = err.Error()
+		return
+	}
+
+	sgClient := newSimGridClient(d.snapshotConfig().SimGridApiToken)
+	msg, attachment, err = d.runNewSeason(apply, selectedTerm, sgClient)
 	if err != nil {
 		msg = err.Error()
 	}
 }
 
-// runNewSeason derives the next season (read-only) and, when apply is true,
-// commits the change. Currently only the read-only preview path is implemented;
-// the apply path is filled in by a later task.
-func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient) (string, string, error) {
+// runNewSeason resolves the target season term — the administrator's explicit
+// selection when one was supplied, otherwise the automatic next term in the
+// season cycle (Winter wraps back to New Year) — and, when apply is true,
+// commits the change.
+func (d *DiscordClient) runNewSeason(apply bool, selectedTerm string, sgClient *simgrid.SimGridClient) (string, string, error) {
 	conf := d.snapshotConfig()
-	currentTerm, err := config.ParseSeasonTerm(conf.Season)
-	if err != nil {
-		return "", "", fmt.Errorf("could not determine current season: %w", err)
-	}
-	nextTerm, err := config.NextTerm(currentTerm)
-	if err != nil {
-		return "", "", err
+	nextTerm := selectedTerm
+	if nextTerm == "" {
+		currentTerm, err := config.ParseSeasonTerm(conf.Season)
+		if err != nil {
+			return "", "", fmt.Errorf("could not determine current season: %w", err)
+		}
+		nextTerm, err = config.NextTerm(currentTerm)
+		if err != nil {
+			return "", "", err
+		}
 	}
 
 	champ, err := sgClient.FindSeasonChampionship("TRACKILICIOUS", nextTerm)
@@ -456,7 +501,11 @@ func (d *DiscordClient) runNewSeason(apply bool, sgClient *simgrid.SimGridClient
 	round1 := champ.Races[0].Track.Name
 
 	if !apply {
-		return buildNewSeasonPreview(champ, season, role, round1), "", nil
+		applyCmd := "!new-season-apply"
+		if selectedTerm != "" {
+			applyCmd = "!new-season-apply " + nextTerm
+		}
+		return buildNewSeasonPreview(champ, season, role, round1, applyCmd), "", nil
 	}
 
 	champID := strconv.Itoa(champ.ID)
@@ -549,8 +598,10 @@ func buildNewSeasonApplied(champ *simgrid.Championship, season, role, round1, br
 }
 
 // buildNewSeasonPreview renders the read-only proposal. It deliberately omits
-// secrets and shows only the season-level values that will change.
-func buildNewSeasonPreview(champ *simgrid.Championship, season, role, round1 string) string {
+// secrets and shows only the season-level values that will change. applyCmd is
+// the exact apply invocation to run next; it retains an explicit season
+// selection when one was supplied.
+func buildNewSeasonPreview(champ *simgrid.Championship, season, role, round1, applyCmd string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "🗓 **New Season Preview**\n\n")
 	fmt.Fprintf(&b, "Championship: %s (#%d) — host %s\n", champ.Name, champ.ID, champ.HostName)
@@ -565,7 +616,7 @@ func buildNewSeasonPreview(champ *simgrid.Championship, season, role, round1 str
 	fmt.Fprintf(&b, "  briefing_folder    %q (created/reused under the current briefing folder's parent)\n", season)
 	fmt.Fprintf(&b, "  tracker_folder     %q (created/reused under the current tracker folder's parent)\n", season)
 	fmt.Fprintf(&b, "Round-0 announces: Round 1 — %s\n", round1)
-	fmt.Fprintf(&b, "\n▶ Run `!new-season-apply` to commit these changes.")
+	fmt.Fprintf(&b, "\n▶ Run `%s` to commit these changes.", applyCmd)
 	return b.String()
 }
 
