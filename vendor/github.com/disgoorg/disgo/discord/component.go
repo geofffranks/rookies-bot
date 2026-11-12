@@ -767,7 +767,27 @@ type UnfurledMediaItem struct {
 	AttachmentID snowflake.ID `json:"attachment_id,omitempty"`
 	// LoadingState is the loading state of the media item. This can't be set by bots.
 	LoadingState UnfurledMediaItemLoadingState `json:"loading_state,omitempty"`
+	// ContentScanMetadata holds the results of Discord's content scanning, if the media item has been scanned. This can't be set by bots.
+	//
+	// Content scanning runs after the message is sent, so this may not be present on the initial message and can be added later in a message update event.
+	ContentScanMetadata *UnfurledMediaItemContentScanMetadata `json:"content_scan_metadata,omitempty"`
 }
+
+// UnfurledMediaItemContentScanMetadata holds the results of Discord's content scanning for an [UnfurledMediaItem].
+type UnfurledMediaItemContentScanMetadata struct {
+	// Flags are the content scan metadata flags combined as a bitfield.
+	Flags UnfurledMediaItemContentScanMetadataFlags `json:"flags"`
+}
+
+// UnfurledMediaItemContentScanMetadataFlags are the flags set by Discord's content scanning on an [UnfurledMediaItem].
+type UnfurledMediaItemContentScanMetadataFlags int
+
+const (
+	UnfurledMediaItemContentScanMetadataFlagIsExplicitContent UnfurledMediaItemContentScanMetadataFlags = 1 << iota
+	UnfurledMediaItemContentScanMetadataFlagIsGoreContent
+	UnfurledMediaItemContentScanMetadataFlagIsSelfHarmContent
+	UnfurledMediaItemContentScanMetadataFlagsNone UnfurledMediaItemContentScanMetadataFlags = 0
+)
 
 type UnfurledMediaItemFlags int
 
@@ -1477,6 +1497,8 @@ type FileUploadComponent struct {
 	MaxValues int `json:"max_values,omitempty"`
 	// Required specifies whether the file upload is required. (default: false)
 	Required bool `json:"required"`
+	// FileTypes is the file types to filter for. (default: allows all file types, max: 10)
+	FileTypes []FileType `json:"file_types,omitempty"`
 	// Values is only set when the FileUploadComponent is received from an InteractionTypeModalSubmit
 	Values []snowflake.ID `json:"values,omitempty"`
 }
@@ -1535,6 +1557,12 @@ func (f FileUploadComponent) WithMaxValues(maxValues int) FileUploadComponent {
 // WithRequired returns a new FileUploadComponent with the provided required
 func (f FileUploadComponent) WithRequired(required bool) FileUploadComponent {
 	f.Required = required
+	return f
+}
+
+// WithFileTypes returns a new FileUploadComponent with the provided fileTypes
+func (f FileUploadComponent) WithFileTypes(fileTypes ...FileType) FileUploadComponent {
+	f.FileTypes = fileTypes
 	return f
 }
 

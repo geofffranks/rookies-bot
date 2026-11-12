@@ -140,10 +140,11 @@ or in these projects:
 * [Kitsune-Bot](https://github.com/TopiSenpai/Kitsune-Bot)
 * [KittyBot](https://github.com/KittyBot-Org/KittyBotGo)
 * [subcordant](https://github.com/apkatsikas/subcordant)
+* [Yugen Stack](https://github.com/jurienhamaker/yugen)
 
 ## Libraries for DisGo
 
-* [disgomd](https://github.com/eminarican/disgomd) is a command utility library that uses struct based approach
+* [strut](https://github.com/schphe/strut) is a struct oriented command framework for disgo
 
 
 ## Other interesting Projects to look at

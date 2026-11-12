@@ -19,6 +19,7 @@ const (
 	AuditLogEventChannelOverwriteCreate
 	AuditLogEventChannelOverwriteUpdate
 	AuditLogEventChannelOverwriteDelete
+	AuditLogEventChannelPositionUpdate
 )
 
 const (
@@ -37,6 +38,7 @@ const (
 	AuditLogEventRoleCreate AuditLogEvent = iota + 30
 	AuditLogEventRoleUpdate
 	AuditLogEventRoleDelete
+	AuditLogEventRolePositionUpdate
 )
 
 const (
@@ -127,6 +129,11 @@ const (
 const (
 	AuditLogHomeSettingsCreate AuditLogEvent = iota + 190
 	AuditLogHomeSettingsUpdate
+)
+
+const (
+	AuditLogVoiceChannelStatusCreate AuditLogEvent = iota + 192
+	AuditLogVoiceChannelStatusDelete
 )
 
 // AuditLogChangeKey is a string representing a key in the audit log change object.
@@ -323,4 +330,5 @@ type OptionalAuditLogEntryInfo struct {
 	AutoModerationRuleName        *string                    `json:"auto_moderation_rule_name"`
 	AutoModerationRuleTriggerType *AutoModerationTriggerType `json:"auto_moderation_rule_trigger_type,string"`
 	IntegrationType               *IntegrationType           `json:"integration_type"`
+	Status                        *string                    `json:"status"`
 }

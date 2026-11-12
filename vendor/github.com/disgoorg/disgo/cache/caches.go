@@ -43,24 +43,26 @@ func (c *selfUserCacheImpl) SetSelfUser(user discord.OAuth2User) {
 }
 
 type GuildCache interface {
-	GuildCache() Cache[discord.Guild]
+	GuildCache() Cache[discord.CacheGuild]
 
 	IsGuildUnready(guildID snowflake.ID) bool
 	SetGuildUnready(guildID snowflake.ID, unready bool)
 	UnreadyGuildIDs() []snowflake.ID
+	// UnreadyGuildsLen returns how many guilds are still unready.
+	UnreadyGuildsLen() int
 
 	IsGuildUnavailable(guildID snowflake.ID) bool
 	SetGuildUnavailable(guildID snowflake.ID, unavailable bool)
 	UnavailableGuildIDs() []snowflake.ID
 
-	Guild(guildID snowflake.ID) (discord.Guild, bool)
-	Guilds() iter.Seq[discord.Guild]
+	Guild(guildID snowflake.ID) (discord.CacheGuild, bool)
+	Guilds() iter.Seq[discord.CacheGuild]
 	GuildsLen() int
-	AddGuild(guild discord.Guild)
-	RemoveGuild(guildID snowflake.ID) (discord.Guild, bool)
+	AddGuild(guild discord.CacheGuild)
+	RemoveGuild(guildID snowflake.ID) (discord.CacheGuild, bool)
 }
 
-func NewGuildCache(cache Cache[discord.Guild], unreadyGuilds Set[snowflake.ID], unavailableGuilds Set[snowflake.ID]) GuildCache {
+func NewGuildCache(cache Cache[discord.CacheGuild], unreadyGuilds Set[snowflake.ID], unavailableGuilds Set[snowflake.ID]) GuildCache {
 	return &guildCacheImpl{
 		cache:             cache,
 		unreadyGuilds:     unreadyGuilds,
@@ -69,12 +71,12 @@ func NewGuildCache(cache Cache[discord.Guild], unreadyGuilds Set[snowflake.ID], 
 }
 
 type guildCacheImpl struct {
-	cache             Cache[discord.Guild]
+	cache             Cache[discord.CacheGuild]
 	unreadyGuilds     Set[snowflake.ID]
 	unavailableGuilds Set[snowflake.ID]
 }
 
-func (c *guildCacheImpl) GuildCache() Cache[discord.Guild] {
+func (c *guildCacheImpl) GuildCache() Cache[discord.CacheGuild] {
 	return c.cache
 }
 
@@ -88,6 +90,10 @@ func (c *guildCacheImpl) SetGuildUnready(guildID snowflake.ID, unready bool) {
 	} else if !c.unreadyGuilds.Has(guildID) && unready {
 		c.unreadyGuilds.Add(guildID)
 	}
+}
+
+func (c *guildCacheImpl) UnreadyGuildsLen() int {
+	return c.unreadyGuilds.Len()
 }
 
 func (c *guildCacheImpl) UnreadyGuildIDs() []snowflake.ID {
@@ -118,11 +124,11 @@ func (c *guildCacheImpl) UnavailableGuildIDs() []snowflake.ID {
 	return guilds
 }
 
-func (c *guildCacheImpl) Guild(guildID snowflake.ID) (discord.Guild, bool) {
+func (c *guildCacheImpl) Guild(guildID snowflake.ID) (discord.CacheGuild, bool) {
 	return c.cache.Get(guildID)
 }
 
-func (c *guildCacheImpl) Guilds() iter.Seq[discord.Guild] {
+func (c *guildCacheImpl) Guilds() iter.Seq[discord.CacheGuild] {
 	return c.cache.All()
 }
 
@@ -130,11 +136,11 @@ func (c *guildCacheImpl) GuildsLen() int {
 	return c.cache.Len()
 }
 
-func (c *guildCacheImpl) AddGuild(guild discord.Guild) {
+func (c *guildCacheImpl) AddGuild(guild discord.CacheGuild) {
 	c.cache.Put(guild.ID, guild)
 }
 
-func (c *guildCacheImpl) RemoveGuild(guildID snowflake.ID) (discord.Guild, bool) {
+func (c *guildCacheImpl) RemoveGuild(guildID snowflake.ID) (discord.CacheGuild, bool) {
 	return c.cache.Remove(guildID)
 }
 
@@ -976,6 +982,10 @@ func (c *cachesImpl) MemberPermissions(member discord.Member) discord.Permission
 }
 
 func (c *cachesImpl) MemberPermissionsInChannel(channel discord.GuildChannel, member discord.Member) discord.Permissions {
+	if channel.Flags().Has(discord.ChannelFlagObfuscated) {
+		return discord.PermissionsNone
+	}
+
 	permissions := c.MemberPermissions(member)
 	if permissions.Has(discord.PermissionAdministrator) {
 		return discord.PermissionsAll
@@ -1002,13 +1012,13 @@ func (c *cachesImpl) MemberPermissionsInChannel(channel discord.GuildChannel, me
 		}
 	}
 
-	if overwrite, ok := channel.PermissionOverwrites().Member(member.User.ID); ok {
-		allow |= overwrite.Allow
-		deny |= overwrite.Deny
-	}
-
 	permissions &= ^deny
 	permissions |= allow
+
+	if overwrite, ok := channel.PermissionOverwrites().Member(member.User.ID); ok {
+		permissions &= ^overwrite.Deny
+		permissions |= overwrite.Allow
+	}
 
 	if member.CommunicationDisabledUntil != nil && member.CommunicationDisabledUntil.After(time.Now()) {
 		permissions &= discord.PermissionViewChannel | discord.PermissionReadMessageHistory

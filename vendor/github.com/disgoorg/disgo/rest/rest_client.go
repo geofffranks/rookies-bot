@@ -82,7 +82,6 @@ func (c *clientImpl) retry(endpoint *CompiledEndpoint, rqBody any, rsBody any, t
 				return fmt.Errorf("failed to marshal request body: %w", err)
 			}
 		}
-		c.config.Logger.Debug("new request", slog.String("endpoint", endpoint.URL), slog.String("body", string(rawRqBody)))
 	}
 
 	rq, err := http.NewRequest(endpoint.Endpoint.Method, c.config.URL+endpoint.URL, bytes.NewReader(rawRqBody))
@@ -102,6 +101,10 @@ func (c *clientImpl) retry(endpoint *CompiledEndpoint, rqBody any, rsBody any, t
 
 	cfg := defaultRequestConfig(rq)
 	cfg.apply(opts)
+
+	if rqBody != nil && c.config.Logger.Enabled(cfg.Ctx, slog.LevelDebug) {
+		c.config.Logger.DebugContext(cfg.Ctx, "new request", slog.String("endpoint", endpoint.URL), slog.String("body", string(rawRqBody)))
+	}
 
 	if cfg.Delay > 0 {
 		timer := time.NewTimer(cfg.Delay)
@@ -145,11 +148,18 @@ func (c *clientImpl) retry(endpoint *CompiledEndpoint, rqBody any, rsBody any, t
 		if rawRsBody, err = io.ReadAll(rs.Body); err != nil {
 			return fmt.Errorf("error reading response body in rest client: %w", err)
 		}
-		c.config.Logger.Debug("new response", slog.String("endpoint", endpoint.URL), slog.String("code", rs.Status), slog.String("body", string(rawRsBody)))
+		if c.config.Logger.Enabled(cfg.Ctx, slog.LevelDebug) {
+			c.config.Logger.DebugContext(cfg.Ctx, "new response", slog.String("endpoint", endpoint.URL), slog.String("code", rs.Status), slog.String("body", string(rawRsBody)))
+		}
 	}
 
 	switch {
 	case rs.StatusCode >= http.StatusOK && rs.StatusCode < http.StatusMultipleChoices:
+		// we assume that if the response code is 204 No Content, the response body is empty and we don't need to unmarshal it
+		if rs.StatusCode == http.StatusNoContent {
+			return nil
+		}
+
 		if rsBody != nil && rs.Body != nil {
 			if err = json.Unmarshal(rawRsBody, rsBody); err != nil {
 				c.config.Logger.Error("error unmarshalling response body", slog.Any("err", err), slog.String("endpoint", endpoint.URL), slog.String("code", rs.Status), slog.String("body", string(rawRsBody)))

@@ -24,15 +24,13 @@ import (
 // GatewayVersion is the version of the voice gateway we are using.
 const GatewayVersion = 8
 
-const maximumConnectDelay = 10 * time.Second
-
-var (
-	// ErrGatewayNotConnected is returned when the gateway is not connected and a message is attempted to be sent.
-	ErrGatewayNotConnected = fmt.Errorf("voice gateway not connected")
-
-	// ErrGatewayAlreadyConnected is returned when the gateway is already connected and a connection is attempted to be opened.
-	ErrGatewayAlreadyConnected = fmt.Errorf("voice gateway already connected")
+const (
+	maximumConnectDelay      = 10 * time.Second
+	maximumReconnectAttempts = 5
 )
+
+// ErrGatewayNotConnected is returned when the gateway is not connected and a message is attempted to be sent.
+var ErrGatewayNotConnected = fmt.Errorf("voice gateway not connected")
 
 // Status returns the current status of the gateway.
 type Status int
@@ -56,10 +54,14 @@ type (
 	GatewayCreateFunc func(daveManager godave.Session, eventHandlerFunc EventHandlerFunc, closeHandlerFunc CloseHandlerFunc, opts ...GatewayConfigOpt) Gateway
 
 	// CloseHandlerFunc is a function that handles a voice gateway close.
-	CloseHandlerFunc func(gateway Gateway, err error, reconnect bool)
+	CloseHandlerFunc func(gateway Gateway, err error)
 
 	// StateProviderFunc is a function that provides the current conn state of the voice gateway.
 	StateProviderFunc func() State
+
+	// CloseObserver is a function that observes the close of the voice gateway and can be used for monitoring.
+	// It is called with the error that caused the close and is called in its own goroutine.
+	CloseObserver func(err error)
 )
 
 // State is the current state of the voice conn.
@@ -67,10 +69,13 @@ type State struct {
 	GuildID snowflake.ID
 	UserID  snowflake.ID
 
-	ChannelID *snowflake.ID
+	ChannelID snowflake.ID
 	SessionID string
 	Token     string
 	Endpoint  string
+
+	SelfMute bool
+	SelfDeaf bool
 }
 
 // Gateway is a websocket connection to the Discord voice gateway.
@@ -137,7 +142,7 @@ func (g *gatewayImpl) SSRC() uint32 {
 }
 
 func (g *gatewayImpl) Open(ctx context.Context, state State) error {
-	return g.doReconnect(ctx, state)
+	return g.doReconnect(ctx, state, 0)
 }
 
 func (g *gatewayImpl) open(ctx context.Context, state State) error {
@@ -146,9 +151,13 @@ func (g *gatewayImpl) open(ctx context.Context, state State) error {
 	g.connMu.Lock()
 	if g.conn != nil {
 		g.connMu.Unlock()
-		return ErrGatewayAlreadyConnected
+		return discord.ErrGatewayAlreadyConnected
 	}
 
+	if state.SessionID != g.state.SessionID {
+		g.ssrc = 0
+		g.seq = 0
+	}
 	g.state = state
 	g.statusMu.Lock()
 	g.status = StatusConnecting
@@ -180,7 +189,7 @@ func (g *gatewayImpl) open(ctx context.Context, state State) error {
 		return nil
 	})
 
-	g.daveSession.SetChannelID(godave.ChannelID(*state.ChannelID))
+	g.daveSession.SetChannelID(godave.ChannelID(state.ChannelID))
 	g.conn = conn
 	g.connMu.Unlock()
 
@@ -250,15 +259,31 @@ func (g *gatewayImpl) Status() Status {
 
 func (g *gatewayImpl) Send(ctx context.Context, op Opcode, d GatewayMessageData) error {
 	g.statusMu.Lock()
+	ready := g.status == StatusReady
+	g.statusMu.Unlock()
+	if !ready {
+		return discord.ErrShardNotReady
+	}
+
+	g.connMu.Lock()
+	defer g.connMu.Unlock()
+
+	g.statusMu.Lock()
 	defer g.statusMu.Unlock()
 	if g.status != StatusReady {
 		return discord.ErrShardNotReady
 	}
 
-	return g.sendInternal(ctx, op, d)
+	return g.sendInternalLocked(ctx, op, d)
 }
 
 func (g *gatewayImpl) sendInternal(ctx context.Context, op Opcode, d GatewayMessageData) error {
+	g.connMu.Lock()
+	defer g.connMu.Unlock()
+	return g.sendInternalLocked(ctx, op, d)
+}
+
+func (g *gatewayImpl) sendInternalLocked(ctx context.Context, op Opcode, d GatewayMessageData) error {
 	if op.IsBinary() {
 		// We are basically writing the following struct here:
 		// {
@@ -274,7 +299,7 @@ func (g *gatewayImpl) sendInternal(ctx context.Context, op Opcode, d GatewayMess
 			return err
 		}
 
-		return g.send(ctx, websocket.BinaryMessage, buf.Bytes())
+		return g.sendLocked(ctx, websocket.BinaryMessage, buf.Bytes())
 	}
 
 	data, err := json.Marshal(GatewayMessage{
@@ -284,17 +309,17 @@ func (g *gatewayImpl) sendInternal(ctx context.Context, op Opcode, d GatewayMess
 	if err != nil {
 		return err
 	}
-	return g.send(ctx, websocket.TextMessage, data)
+	return g.sendLocked(ctx, websocket.TextMessage, data)
 }
 
-func (g *gatewayImpl) send(ctx context.Context, messageType int, data []byte) error {
-	g.connMu.Lock()
-	defer g.connMu.Unlock()
+func (g *gatewayImpl) sendLocked(ctx context.Context, messageType int, data []byte) error {
 	if g.conn == nil {
 		return ErrGatewayNotConnected
 	}
 
-	g.config.Logger.DebugContext(ctx, "sending voice gateway command", slog.String("data", string(data)))
+	if g.config.Logger.Enabled(ctx, slog.LevelDebug) {
+		g.config.Logger.DebugContext(ctx, "sending voice gateway command", slog.String("data", string(data)))
+	}
 	return g.conn.WriteMessage(messageType, data)
 }
 
@@ -302,29 +327,26 @@ func (g *gatewayImpl) Latency() time.Duration {
 	return g.lastHeartbeatReceived.Sub(g.lastHeartbeatSent)
 }
 
-func (g *gatewayImpl) doReconnect(ctx context.Context, state State) error {
-	var (
-		try              int
-		backoffIncrement int
-	)
-
+func (g *gatewayImpl) doReconnect(ctx context.Context, state State, maximumAttempts int) error {
+	var err error
+	attempt := 0
+	delay := time.Duration(0)
 	for {
-		// Exponentially backoff up to a limit of 10s
-		delay := time.Duration(1<<backoffIncrement) * time.Second
-		if delay > maximumConnectDelay {
-			delay = maximumConnectDelay
-		} else {
-			backoffIncrement++
+		if maximumAttempts > 0 && attempt >= maximumAttempts {
+			return fmt.Errorf("failed to reconnect voice gateway after %d attempts: %w", maximumAttempts, err)
+		}
+		attempt++
+
+		if delay > 0 {
+			timer := time.NewTimer(delay)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-timer.C:
+			}
 		}
 
-		timer := time.NewTimer(time.Duration(try) * delay)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
-		}
-
-		err := g.open(ctx, state)
+		err = g.open(ctx, state)
 		if err == nil {
 			// Successfully connected, our job here is done
 			return nil
@@ -342,22 +364,27 @@ func (g *gatewayImpl) doReconnect(ctx context.Context, state State) error {
 			}
 		}
 
-		g.config.Logger.Error("failed to reconnect voice gateway", slog.Any("err", err), slog.Int("try", try), slog.Duration("delay", delay))
+		g.config.Logger.Error("failed to reconnect voice gateway", slog.Any("err", err), slog.Int("attempt", attempt), slog.Duration("delay", delay))
 		g.statusMu.Lock()
 		g.status = StatusDisconnected
 		g.statusMu.Unlock()
 
-		try++
+		delay = nextReconnectDelay(delay)
 	}
 }
 
+func nextReconnectDelay(delay time.Duration) time.Duration {
+	if delay == 0 {
+		return time.Second
+	}
+	return min(delay*2, maximumConnectDelay)
+}
+
 func (g *gatewayImpl) reconnect() {
-	if err := g.doReconnect(context.Background(), g.state); err != nil {
+	if err := g.doReconnect(context.Background(), g.state, maximumReconnectAttempts); err != nil {
 		g.config.Logger.Error("failed to reopen voice gateway", slog.Any("err", err))
 
-		if g.closeHandlerFunc != nil {
-			g.closeHandlerFunc(g, err, false)
-		}
+		g.closeHandlerFunc(g, err)
 	}
 }
 
@@ -508,13 +535,17 @@ func (g *gatewayImpl) listen(conn *websocket.Conn, ready func(error)) {
 				g.config.Logger.Warn("failed to read next message from voice gateway", slog.Any("err", err))
 			}
 
+			if g.config.Observer != nil {
+				go g.config.Observer(err)
+			}
+
 			// make sure the connection is properly closed
 			g.CloseWithCode(websocket.CloseServiceRestart, "reconnecting")
-			if g.config.AutoReconnect && reconnect {
+			if reconnect {
 				go g.reconnect()
-			} else if g.closeHandlerFunc != nil {
-				go g.closeHandlerFunc(g, err, reconnect)
+				return
 			}
+			go g.closeHandlerFunc(g, err)
 
 			return
 		}
@@ -563,6 +594,7 @@ func (g *gatewayImpl) listen(conn *websocket.Conn, ready func(error)) {
 			d := message.D.(GatewayMessageDataHeartbeatACK)
 			if d.T != g.lastNonce {
 				g.config.Logger.Error("received heartbeat ack with nonce", slog.Int64("nonce", d.T), slog.Int64("last_nonce", g.lastNonce))
+				g.CloseWithCode(websocket.CloseServiceRestart, "heartbeat ACK nonce mismatch")
 				go g.reconnect()
 				return
 			}
