@@ -13,6 +13,20 @@ func gatewayHandlerVoiceChannelEffectSend(client *bot.Client, sequenceNumber int
 	})
 }
 
+func gatewayHandlerVoiceChannelStatusUpdate(client *bot.Client, sequenceNumber int, shardID int, event gateway.EventVoiceChannelStatusUpdate) {
+	client.EventManager.DispatchEvent(&events.GuildVoiceChannelStatusUpdate{
+		GenericEvent:                  events.NewGenericEvent(client, sequenceNumber, shardID),
+		EventVoiceChannelStatusUpdate: event,
+	})
+}
+
+func gatewayHandlerVoiceChannelStartTimeUpdate(client *bot.Client, sequenceNumber int, shardID int, event gateway.EventVoiceChannelStartTimeUpdate) {
+	client.EventManager.DispatchEvent(&events.GuildVoiceChannelStartTimeUpdate{
+		GenericEvent:                     events.NewGenericEvent(client, sequenceNumber, shardID),
+		EventVoiceChannelStartTimeUpdate: event,
+	})
+}
+
 func gatewayHandlerVoiceStateUpdate(client *bot.Client, sequenceNumber int, shardID int, event gateway.EventVoiceStateUpdate) {
 	member := event.Member
 
@@ -40,10 +54,12 @@ func gatewayHandlerVoiceStateUpdate(client *bot.Client, sequenceNumber int, shar
 	})
 
 	if oldOk && oldVoiceState.ChannelID != nil && event.ChannelID != nil {
-		client.EventManager.DispatchEvent(&events.GuildVoiceMove{
-			GenericGuildVoiceState: genericGuildVoiceEvent,
-			OldVoiceState:          oldVoiceState,
-		})
+		if *oldVoiceState.ChannelID != *event.ChannelID {
+			client.EventManager.DispatchEvent(&events.GuildVoiceMove{
+				GenericGuildVoiceState: genericGuildVoiceEvent,
+				OldVoiceState:          oldVoiceState,
+			})
+		}
 	} else if (oldOk || oldVoiceState.ChannelID == nil) && event.ChannelID != nil {
 		client.EventManager.DispatchEvent(&events.GuildVoiceJoin{
 			GenericGuildVoiceState: genericGuildVoiceEvent,

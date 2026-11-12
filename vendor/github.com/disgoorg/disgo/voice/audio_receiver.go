@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"time"
 
 	"github.com/disgoorg/snowflake/v2"
 )
@@ -82,6 +83,13 @@ func (s *defaultAudioReceiver) CleanupUser(userID snowflake.ID) {
 }
 
 func (s *defaultAudioReceiver) receive() {
+	// we only pull frames when the DAVE session is ready so we can decrypt them
+	if !s.conn.DAVE().Ready() {
+		// wait a frame instead of spinning until the session is ready
+		time.Sleep(OpusFrameSizeMs * time.Millisecond)
+		return
+	}
+
 	packet, err := s.conn.UDP().ReadPacket()
 	if errors.Is(err, net.ErrClosed) {
 		s.Close()

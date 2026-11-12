@@ -2,12 +2,14 @@ package voice
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/disgoorg/godave"
 	"github.com/disgoorg/snowflake/v2"
+	"github.com/gorilla/websocket"
 
 	botgateway "github.com/disgoorg/disgo/gateway"
 )
@@ -23,6 +25,8 @@ type (
 
 		// UDP returns the voice UDPConn conn used by the voice Conn.
 		UDP() UDPConn
+
+		DAVE() godave.Session
 
 		// ChannelID returns the ID of the voice channel the voice Conn is openedChan to.
 		ChannelID() *snowflake.ID
@@ -42,9 +46,6 @@ type (
 		// SetOpusFrameReceiver lets you inject your own OpusFrameReceiver.
 		SetOpusFrameReceiver(handler OpusFrameReceiver)
 
-		// SetEventHandlerFunc lets listen for voice gateway events.
-		SetEventHandlerFunc(eventHandlerFunc EventHandlerFunc)
-
 		// Open opens the voice conn. It will connect to the voice gateway and start the Conn conn after it receives the Gateway events.
 		Open(ctx context.Context, channelID snowflake.ID, selfMute bool, selfDeaf bool) error
 
@@ -59,6 +60,8 @@ type (
 	}
 )
 
+const voiceReconnectTimeout = 30 * time.Second
+
 // NewConn returns a new default voice conn.
 func NewConn(guildID snowflake.ID, userID snowflake.ID, voiceStateUpdateFunc StateUpdateFunc, removeConnFunc func(), opts ...ConnConfigOpt) Conn {
 	cfg := defaultConnConfig()
@@ -72,11 +75,11 @@ func NewConn(guildID snowflake.ID, userID snowflake.ID, voiceStateUpdateFunc Sta
 			GuildID: guildID,
 			UserID:  userID,
 		},
-		openedChan: make(chan struct{}, 1),
-		ssrcs:      map[uint32]snowflake.ID{},
+		ssrcs: map[uint32]snowflake.ID{},
 	}
 
 	daveSession := cfg.DaveSessionCreate(cfg.DaveSessionLogger, godave.UserID(userID.String()), conn)
+	conn.dave = daveSession
 	conn.gateway = cfg.GatewayCreateFunc(daveSession, conn.handleMessage, conn.handleGatewayClose, append([]GatewayConfigOpt{WithGatewayLogger(cfg.Logger)}, cfg.GatewayConfigOpts...)...)
 	conn.udp = cfg.UDPConnCreateFunc(daveSession, conn.UserIDBySSRC, append([]UDPConnConfigOpt{WithUDPConnLogger(cfg.Logger)}, cfg.UDPConnConfigOpts...)...)
 
@@ -93,11 +96,17 @@ type connImpl struct {
 
 	gateway Gateway
 	udp     UDPConn
+	dave    godave.Session
 
 	audioSender   AudioSender
 	audioReceiver AudioReceiver
 
-	openedChan chan struct{}
+	openedFunc context.CancelFunc
+
+	// Discord completes a voice handshake with one event from each gateway.
+	// Only open after receiving a fresh pair so old state is never reused.
+	voiceStateReceived  bool
+	voiceServerReceived bool
 
 	ssrcs   map[uint32]snowflake.ID
 	ssrcsMu sync.Mutex
@@ -120,7 +129,13 @@ func (c *connImpl) SendInvalidCommitWelcome(transitionID uint16) error {
 }
 
 func (c *connImpl) ChannelID() *snowflake.ID {
-	return c.state.ChannelID
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	if c.state.ChannelID == 0 {
+		return nil
+	}
+	channelID := c.state.ChannelID
+	return &channelID
 }
 
 func (c *connImpl) GuildID() snowflake.ID {
@@ -148,6 +163,10 @@ func (c *connImpl) UDP() UDPConn {
 	return c.udp
 }
 
+func (c *connImpl) DAVE() godave.Session {
+	return c.dave
+}
+
 func (c *connImpl) SetOpusFrameProvider(provider OpusFrameProvider) {
 	if c.audioSender != nil {
 		c.audioSender.Close()
@@ -164,17 +183,17 @@ func (c *connImpl) SetOpusFrameReceiver(handler OpusFrameReceiver) {
 	c.audioReceiver.Open()
 }
 
-func (c *connImpl) SetEventHandlerFunc(eventHandlerFunc EventHandlerFunc) {
-	c.config.EventHandlerFunc = eventHandlerFunc
-}
-
 func (c *connImpl) HandleVoiceStateUpdate(update botgateway.EventVoiceStateUpdate) {
 	if update.GuildID != c.state.GuildID || update.UserID != c.state.UserID {
 		return
 	}
 
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+
 	if update.ChannelID == nil {
-		c.state.ChannelID = nil
+		c.state.ChannelID = 0
+		c.resetVoiceEventsLocked()
 		if c.audioSender != nil {
 			c.audioSender.Close()
 			c.audioSender = nil
@@ -186,24 +205,43 @@ func (c *connImpl) HandleVoiceStateUpdate(update botgateway.EventVoiceStateUpdat
 		_ = c.udp.Close()
 		c.gateway.Close()
 	} else {
-		c.state.ChannelID = update.ChannelID
+		c.state.ChannelID = *update.ChannelID
+		c.voiceStateReceived = true
 	}
 	c.state.SessionID = update.SessionID
+	c.state.SelfMute = update.SelfMute
+	c.state.SelfDeaf = update.SelfDeaf
+
+	c.tryOpenGateway()
 }
 
 func (c *connImpl) HandleVoiceServerUpdate(update botgateway.EventVoiceServerUpdate) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
+
 	if update.GuildID != c.state.GuildID || update.Endpoint == nil {
 		return
 	}
 
 	c.state.Token = update.Token
 	c.state.Endpoint = *update.Endpoint
+	c.voiceServerReceived = true
+	c.tryOpenGateway()
+}
+
+func (c *connImpl) tryOpenGateway() {
+	if c.state.SessionID == "" || c.state.Token == "" || c.state.Endpoint == "" || c.state.ChannelID == 0 {
+		return
+	}
+	if !c.voiceStateReceived || !c.voiceServerReceived {
+		return
+	}
+	state := c.state
+	c.resetVoiceEventsLocked()
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), voiceReconnectTimeout)
 		defer cancel()
-		if err := c.gateway.Open(ctx, c.state); err != nil {
+		if err := c.gateway.Open(ctx, state); err != nil {
 			c.config.Logger.Error("error opening voice gateway", slog.Any("err", err))
 		}
 	}()
@@ -241,22 +279,24 @@ func (c *connImpl) handleMessage(gateway Gateway, op Opcode, sequenceNumber int,
 		if err := c.udp.SetSecretKey(d.Mode, d.SecretKey); err != nil {
 			c.config.Logger.Error("voice: failed to set secret key", slog.Any("err", err))
 		}
-		c.openedChan <- struct{}{}
+		if openedFunc := c.openedFunc; openedFunc != nil {
+			openedFunc()
+		}
 
 	case GatewayMessageDataSpeaking:
 		c.ssrcsMu.Lock()
-		defer c.ssrcsMu.Unlock()
 		c.ssrcs[d.SSRC] = d.UserID
+		c.ssrcsMu.Unlock()
 
 	case GatewayMessageDataClientDisconnect:
 		c.ssrcsMu.Lock()
-		defer c.ssrcsMu.Unlock()
 		for ssrc, userID := range c.ssrcs {
 			if userID == d.UserID {
 				delete(c.ssrcs, ssrc)
 				break
 			}
 		}
+		c.ssrcsMu.Unlock()
 		if c.audioReceiver != nil {
 			c.audioReceiver.CleanupUser(d.UserID)
 		}
@@ -266,7 +306,38 @@ func (c *connImpl) handleMessage(gateway Gateway, op Opcode, sequenceNumber int,
 	}
 }
 
-func (c *connImpl) handleGatewayClose(_ Gateway, _ error, _ bool) {
+func (c *connImpl) handleGatewayClose(_ Gateway, err error) {
+	newConnection := true
+	var closeError *websocket.CloseError
+	if errors.As(err, &closeError) {
+		closeCode := GatewayCloseEventCodeByCode(closeError.Code)
+		newConnection = closeCode.NewConnection
+	}
+
+	if newConnection {
+		c.stateMu.Lock()
+		channelID := c.state.ChannelID
+		selfMute := c.state.SelfMute
+		selfDeaf := c.state.SelfDeaf
+		c.state.SessionID = ""
+		c.state.Token = ""
+		c.state.Endpoint = ""
+		c.stateMu.Unlock()
+
+		_ = c.udp.Close()
+		if channelID == 0 {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), voiceReconnectTimeout)
+		defer cancel()
+		if err = c.Open(ctx, channelID, selfMute, selfDeaf); err != nil {
+			c.config.Logger.Error("voice: failed to reopen voice conn with a fresh session", slog.Any("err", err))
+		} else {
+			return
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c.Close(ctx)
@@ -275,12 +346,21 @@ func (c *connImpl) handleGatewayClose(_ Gateway, _ error, _ bool) {
 func (c *connImpl) Open(ctx context.Context, channelID snowflake.ID, selfMute bool, selfDeaf bool) error {
 	c.config.Logger.Debug("opening voice conn")
 
-	if err := c.voiceStateUpdateFunc(ctx, c.state.GuildID, &channelID, selfMute, selfDeaf); err != nil {
+	openedCtx, cancel := context.WithCancel(context.Background())
+	c.openedFunc = cancel
+	defer cancel()
+
+	c.stateMu.Lock()
+	c.resetVoiceEventsLocked()
+	guildID := c.state.GuildID
+	c.stateMu.Unlock()
+
+	if err := c.voiceStateUpdateFunc(ctx, guildID, &channelID, selfMute, selfDeaf); err != nil {
 		return err
 	}
 
 	select {
-	case <-c.openedChan:
+	case <-openedCtx.Done():
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
@@ -292,6 +372,12 @@ func (c *connImpl) Close(ctx context.Context) {
 
 	c.gateway.Close()
 	_ = c.udp.Close()
+	_ = c.dave.Close()
 
 	c.removeConnFunc()
+}
+
+func (c *connImpl) resetVoiceEventsLocked() {
+	c.voiceStateReceived = false
+	c.voiceServerReceived = false
 }
